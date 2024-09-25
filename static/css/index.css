@@ -1,0 +1,146 @@
+ p {
+     text-align: justify;
+     font-size: 16px;
+ }
+ 
+ ol {
+     text-align: justify;
+ }
+ 
+ body {
+     font-family: 'Noto Sans', sans-serif;
+ }
+ 
+ #tabResults td:nth-child(2),
+ #tabResults td:nth-child(3),
+ #tabResults td:nth-child(8),
+ #tabResults td:nth-child(14) {
+     /* border-left: 1px solid black;
+        border-right: 1px solid black; */
+ }
+ 
+ .subtitle {
+     font-size: 16px;
+     text-align: justify;
+ }
+ 
+ .footer .icon-link {
+     font-size: 25px;
+     color: #000;
+ }
+ 
+ .link-block a {
+     margin-top: 5px;
+     margin-bottom: 5px;
+ }
+ 
+ .dnerf {
+     font-variant: small-caps;
+ }
+ 
+ .teaser .hero-body {
+     padding-top: 0;
+     padding-bottom: 3rem;
+ }
+ 
+ .teaser {
+     font-family: 'Google Sans', sans-serif;
+ }
+ 
+ .publication-title {}
+ 
+ .publication-banner {
+     max-height: parent;
+ }
+ 
+ .publication-banner video {
+     position: relative;
+     left: auto;
+     top: auto;
+     transform: none;
+     object-fit: fit;
+ }
+ 
+ .publication-header .hero-body {}
+ 
+ .publication-title {
+     font-family: 'Google Sans', sans-serif;
+ }
+ 
+ .publication-authors {
+     font-family: 'Google Sans', sans-serif;
+ }
+ 
+ .publication-venue {
+     color: #555;
+     width: fit-content;
+     font-weight: bold;
+ }
+ 
+ .publication-awards {
+     color: #ff3860;
+     width: fit-content;
+     font-weight: bolder;
+ }
+ 
+ .publication-authors {}
+ 
+ .publication-authors a {
+     color: hsl(204, 86%, 53%) !important;
+ }
+ 
+ .publication-authors a:hover {
+     text-decoration: underline;
+ }
+ 
+ .author-block {
+     display: inline-block;
+ }
+ 
+ .publication-banner img {}
+ 
+ .publication-authors {
+     /*color: #4286f4;*/
+ }
+ 
+ .publication-video {
+     position: relative;
+     width: 100%;
+     height: 0;
+     padding-bottom: 56.25%;
+     overflow: hidden;
+     border-radius: 10px !important;
+ }
+ 
+ .publication-video iframe {
+     position: absolute;
+     top: 0;
+     left: 0;
+     width: 100%;
+     height: 100%;
+ }
+ 
+ .publication-body img {}
+ 
+ .results-carousel {
+     overflow: hidden;
+ }
+ 
+ .results-carousel .item {
+     margin: 5px;
+     overflow: hidden;
+     padding: 20px;
+     font-size: 0;
+ }
+ 
+ .results-carousel video {
+     margin: 0;
+ }
+ 
+ .slider-pagination .slider-page {
+     background: #000000;
+ }
+ 
+ .eql-cntrb {
+     font-size: smaller;
+ }
