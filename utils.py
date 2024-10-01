@@ -74,11 +74,10 @@ def get_caption_model_processor(model_name="Salesforce/blip2-opt-2.7b", device=N
     return {'model': model.to(device), 'processor': processor}
 
 
-def get_yolo_model():
+def get_yolo_model(model_path):
     from ultralytics import YOLO
     # Load the model.
-    # model = YOLO('/home/yadonglu/sandbox/data/yolo/runs/detect/yolov8n_v8_xcyc/weights/best.pt')
-    model = YOLO('/home/yadonglu/sandbox/data/yolo/runs/detect/yolov8n_v8_seq_xcyc_b32_n4_office_ep20/weights/best.pt')
+    model = YOLO(model_path)
     return model
 
 

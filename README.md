@@ -6,6 +6,12 @@
 
 **OmniParser** is a comprehensive method for parsing user interface screenshots into structured and easy-to-understand elements, which significantly enhances the ability of GPT-4V to generate actions that can be accurately grounded in the corresponding regions of the interface. 
 
+## Install 
+```python
+conda create -n "omni" python==3.12
+pip install -r requirements.txt
+```
+
 ## Examples:
 We put together a few simple examples in the demo.ipynb. 
 
