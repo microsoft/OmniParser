@@ -105,6 +105,13 @@
                                 <span>arXiv</span>
                                 </a>
                                 </span>
+                    <span class="link-block">
+                        <a href="https://www.microsoft.com/en-us/research/articles/omniparser-for-pure-vision-based-gui-agent/"
+                            class="external-link button is-normal is-rounded is-dark">
+                            <span class="icon">
+                                <i class="fas fa-book"></i>
+                            </span>
+                            <span>Blog post</span>
 
                     <!-- Demo link -->
 <!--                     <span class="link-block"> -->
@@ -177,7 +184,7 @@
                             <img src="static/images/flow_merged1.png" alt="Result mobile" />
                             <img src="static/images/flow_merged2.png" alt="Result mobile" />
                             <h2 class="subtitle">
-                                Examples of parsed screenshot image and local semantics by \textsc{OmniParser}. The inputs to OmniParse are user task and UI screenshot, from which it will produce: 1. parsed screenshot image with bounding boxes and numeric IDs overlayed, and 2. local semantics contains both text extracted and icon description. 
+                                Examples of parsed screenshot image and local semantics by OmniParser. The inputs to OmniParse are user task and UI screenshot, from which it will produce: 1. parsed screenshot image with bounding boxes and numeric IDs overlayed, and 2. local semantics contains both text extracted and icon description. 
                             </h2>
                         </div>
                     <!-- </div> -->
@@ -243,6 +250,25 @@
                             <img src="static/images/seeclick.png" alt="seeclick" />
                             <img src="static/images/m2w.png" alt="mind2web" />
                             <img src="static/images/aitw.png" alt="aitw" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="hero is-small"></section>
+        <div class="hero-body">
+            <div class="container  is-max-desktop">
+                <div class="columns is-centered has-text-centered">
+                    <div class="column is-four-fifths">
+                        <h2 class="title is-3">Plugin-ready for Other Vision Language Models</h2>
+                        <br>
+                        To further demonstrate OmniParser is a plugin choice for off-the-shelf vision langauge models, we show the performance of OmniParser combined with recently announced vision language models: Phi-3.5-V and Llama-3.2-V. As seen in table, our finetuned interactable region detection (ID) model significantly improves the task performance compared to grounding dino model (w.o. ID) with local semantics across all subcategories for GPT-4V, Phi-3.5-V and Llama-3.2-V. In addition, the local semantics of icon functionality helps significantly with the performance for every vision language model. 
+
+                        In the table, LS is short for local semantics of icon functionality, ID is short for the interactable region detection model we finetune. The setting w.o. ID means we replace the ID model with original Grounding DINO model not finetuned on our data, and with local semantics. The setting w.o. ID and w.o LS means we use Grounding DINO model, and further without using the icon description in the text prompt. 
+                        <div class="item">
+                            <img src="static/images/ablation.png" alt="seeclick" />
                         </div>
                     </div>
                 </div>
