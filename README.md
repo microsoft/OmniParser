@@ -1,8 +1,8 @@
 # OmniParser: Screen Parsing tool for Pure Vision Based GUI Agent
 
-<div style="text-align: center;">
+<p align="center">
   <img src="imgs/logo.png" alt="Logo">
-</div>
+</p>
 
 [![arXiv](https://img.shields.io/badge/Paper-green)](https://arxiv.org/abs/2408.00203)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
