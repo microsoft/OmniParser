@@ -12,8 +12,8 @@ from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, ge
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model(model_path='weights/omniparser/weights/best.pt')
-caption_model_processor = get_caption_model_processor(model_name_or_path="weights/omniparser/blipv2_ui_merge", device='cuda')
+yolo_model = get_yolo_model(model_path='weights/omniparser/icon_caption_blip2/best.pt')
+caption_model_processor = get_caption_model_processor(model_name_or_path="weights/omniparser/icon_caption_blip2", device='cuda')
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
