@@ -28,7 +28,7 @@ We put together a few simple examples in the demo.ipynb.
 ## Gradio Demo
 To run gradio demo, simply run:
 ```python
-python gradion_demo.py
+python gradio_demo.py
 ```
 
 

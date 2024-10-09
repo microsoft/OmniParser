@@ -12,8 +12,8 @@ from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, ge
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model()
-caption_model_processor = get_caption_model_processor('florence', device='cuda') # 'blip2-opt-2.7b-ui', phi3v_ui florence
+yolo_model = get_yolo_model(model_path='weights/omniparser/weights/best.pt')
+caption_model_processor = get_caption_model_processor(model_name_or_path="weights/omniparser/blipv2_ui_merge", device='cuda')
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
@@ -63,14 +63,14 @@ def process(
     prompt: str = None
 ) -> Optional[Image.Image]:
 
-    image_path = "/home/yadonglu/sandbox/data/omniparser_demo/image_input.png"
-    image_input.save(image_path)
+    image_save_path = 'imgs/saved_image_demo.png'
+    image_input.save(image_save_path)
     # import pdb; pdb.set_trace()
 
-    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
+    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
     text, ocr_bbox = ocr_bbox_rslt
     print('prompt:', prompt)
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, yolo_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=0.3,prompt=prompt)
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=0.3,prompt=prompt)
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
     parsed_content_list = '\n'.join(parsed_content_list)
