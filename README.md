@@ -18,7 +18,8 @@
 ## Install 
 ```python
 conda create -n "omni" python==3.12
-pip install -r requirements.txt
+conda activate omni
+pip install -r requirement.txt
 ```
 
 ## Examples:
