@@ -12,8 +12,8 @@
 **OmniParser** is a comprehensive method for parsing user interface screenshots into structured and easy-to-understand elements, which significantly enhances the ability of GPT-4V to generate actions that can be accurately grounded in the corresponding regions of the interface. 
 
 ## News
-- [Upcoming] Both Interactive Region Detection Model and Icon functional description model will be release soon. 
-- [2024/09] OmniParser achieves the best performance on [[Windows Agent Arena](https://microsoft.github.io/WindowsAgentArena/)]! 
+- [2024/10] Both Interactive Region Detection Model and Icon functional description model are released! [Hugginface models](https://huggingface.co/microsoft/OmniParser)
+- [2024/09] OmniParser achieves the best performance on [Windows Agent Arena](https://microsoft.github.io/WindowsAgentArena/)! 
 
 ## Install 
 ```python
