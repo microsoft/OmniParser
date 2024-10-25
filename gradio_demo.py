@@ -8,12 +8,26 @@ import io
 
 
 import base64, os
+
+from huggingface_hub import hf_hub_download
+
 from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model(model_path='weights/omniparser/icon_caption_blip2/best.pt')
-caption_model_processor = get_caption_model_processor(model_name_or_path="weights/omniparser/icon_caption_blip2", device='cuda')
+yolo_model_path = hf_hub_download(
+    repo_id="microsoft/OmniParser",
+    filename="icon_detect/best.pt",
+    revision="61d8bf905fb0d6a0cef80bf625f01295e4465314"
+)
+# Fetch caption model path from Hugging Face cache
+caption_model_path = hf_hub_download(
+    repo_id="microsoft/OmniParser",
+    filename="icon_caption_blip2",
+    revision="61d8bf905fb0d6a0cef80bf625f01295e4465314"
+)
+yolo_model = get_yolo_model(model_path=yolo_model_path)
+caption_model_processor = get_caption_model_processor(model_name_or_path=caption_model_path, device='cuda')
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
