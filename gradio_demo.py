@@ -22,7 +22,7 @@ if platform == 'pc':
         'text_padding': 2,
         'thickness': 2,
     }
-    BOX_TRESHOLD = 0.05
+    BOX_THRESHOLD = 0.05
 elif platform == 'web':
     draw_bbox_config = {
         'text_scale': 0.8,
@@ -30,7 +30,7 @@ elif platform == 'web':
         'text_padding': 3,
         'thickness': 3,
     }
-    BOX_TRESHOLD = 0.05
+    BOX_THRESHOLD = 0.05
 elif platform == 'mobile':
     draw_bbox_config = {
         'text_scale': 0.8,
@@ -38,7 +38,7 @@ elif platform == 'mobile':
         'text_padding': 3,
         'thickness': 3,
     }
-    BOX_TRESHOLD = 0.05
+    BOX_THRESHOLD = 0.05
 
 
 
@@ -70,7 +70,7 @@ def process(
     ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
     text, ocr_bbox = ocr_bbox_rslt
     print('prompt:', prompt)
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=0.3,prompt=prompt)
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_THRESHOLD = BOX_THRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=0.3,prompt=prompt)
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
     parsed_content_list = '\n'.join(parsed_content_list)
