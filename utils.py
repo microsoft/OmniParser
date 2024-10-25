@@ -31,6 +31,7 @@ import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
+from transformers import AddedToken
 
 
 def get_caption_model_processor(model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
@@ -46,6 +47,14 @@ def get_caption_model_processor(model_name_or_path="Salesforce/blip2-opt-2.7b", 
         model = Blip2ForConditionalGeneration.from_pretrained(
         model_name_or_path, device_map=None, torch_dtype=torch.float16
     )
+
+    processor.num_query_tokens = model.config.num_query_tokens
+    image_token = AddedToken("<image>", normalized=False, special=True)
+    processor.tokenizer.add_tokens([image_token], special_tokens=True)
+
+    model.resize_token_embeddings(len(processor.tokenizer), pad_to_multiple_of=64) # pad for efficient computation
+    model.config.image_token_index = len(processor.tokenizer) - 1
+
     return {'model': model.to(device), 'processor': processor}
 
 

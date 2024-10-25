@@ -12,4 +12,4 @@ opencv-python-headless
 gradio
 dill
 accelerate
-
+huggingface_hub
