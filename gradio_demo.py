@@ -12,8 +12,8 @@ from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, ge
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model(model_path='weights/omniparser/icon_caption_blip2/best.pt')
-caption_model_processor = get_caption_model_processor(model_name_or_path="weights/omniparser/icon_caption_blip2", device='cuda')
+yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
+caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
@@ -22,7 +22,6 @@ if platform == 'pc':
         'text_padding': 2,
         'thickness': 2,
     }
-    BOX_TRESHOLD = 0.05
 elif platform == 'web':
     draw_bbox_config = {
         'text_scale': 0.8,
@@ -30,7 +29,6 @@ elif platform == 'web':
         'text_padding': 3,
         'thickness': 3,
     }
-    BOX_TRESHOLD = 0.05
 elif platform == 'mobile':
     draw_bbox_config = {
         'text_scale': 0.8,
@@ -38,7 +36,6 @@ elif platform == 'mobile':
         'text_padding': 3,
         'thickness': 3,
     }
-    BOX_TRESHOLD = 0.05
 
 
 
@@ -50,7 +47,7 @@ MARKDOWN = """
     </a>
 </div>
 
-OmniParser is a screen parsing tool to convert general GUI screen to structured elements.  **Trained models will be released soon**
+OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
 """
 
 DEVICE = torch.device('cuda')
@@ -60,7 +57,8 @@ DEVICE = torch.device('cuda')
 # @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
 def process(
     image_input,
-    prompt: str = None
+    box_threshold,
+    iou_threshold
 ) -> Optional[Image.Image]:
 
     image_save_path = 'imgs/saved_image_demo.png'
@@ -69,8 +67,8 @@ def process(
 
     ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
     text, ocr_bbox = ocr_bbox_rslt
-    print('prompt:', prompt)
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=0.3,prompt=prompt)
+    # print('prompt:', prompt)
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
     parsed_content_list = '\n'.join(parsed_content_list)
@@ -84,7 +82,12 @@ with gr.Blocks() as demo:
         with gr.Column():
             image_input_component = gr.Image(
                 type='pil', label='Upload image')
-            prompt_input_component = gr.Textbox(label='Prompt', placeholder='')
+            # set the threshold for removing the bounding boxes with low confidence, default is 0.05
+            box_threshold_component = gr.Slider(
+                label='Box Threshold', minimum=0.01, maximum=1.0, step=0.01, value=0.05)
+            # set the threshold for removing the bounding boxes with large overlap, default is 0.1
+            iou_threshold_component = gr.Slider(
+                label='IOU Threshold', minimum=0.01, maximum=1.0, step=0.01, value=0.1)
             submit_button_component = gr.Button(
                 value='Submit', variant='primary')
         with gr.Column():
@@ -95,7 +98,8 @@ with gr.Blocks() as demo:
         fn=process,
         inputs=[
             image_input_component,
-            prompt_input_component,
+            box_threshold_component,
+            iou_threshold_component
         ],
         outputs=[image_output_component, text_output_component]
     )

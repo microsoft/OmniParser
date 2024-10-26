@@ -1,2 +1,4 @@
 weights/icon_caption_blip2
 weights/icon_caption_florence
+.gradio
+__pycache__
