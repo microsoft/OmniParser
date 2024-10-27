@@ -64,6 +64,7 @@ def get_yolo_model(model_path):
     return model
 
 
+@torch.inference_mode()
 def get_parsed_content_icon(filtered_boxes, ocr_bbox, image_source, caption_model_processor, prompt=None):
     to_pil = ToPILImage()
     if ocr_bbox:
