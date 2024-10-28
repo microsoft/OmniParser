@@ -31,7 +31,7 @@ python weights/convert_safetensor_to_pt.py
 ```
 
 ## Examples:
-We put together a few simple examples in the demo.ipynb. 
+We put together a few simple examples in the demo.ipynb
 
 ## Gradio Demo
 To run gradio demo, simply run:
