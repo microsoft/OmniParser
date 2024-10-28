@@ -13,4 +13,4 @@ gradio
 dill
 accelerate
 timm
-einops=0.8.0
+einops==0.8.0
