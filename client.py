@@ -3,6 +3,31 @@ This module provides a command-line interface to interact with the OmniParser Gr
 
 Usage:
     python client.py "http://<server_ip>:7861" "path/to/image.jpg"
+
+View results:
+    JSON: cat result_data_<timestamp>.json
+    Image:
+        macOS:   open output_image_<timestamp>.png
+        Windows: start output_image_<timestamp>.png
+        Linux:   xdg-open output_image_<timestamp>.png
+
+Result data format:
+    {
+        "label_coordinates": {
+            "0": [x1, y1, width, height],  // Normalized coordinates for each bounding box
+            "1": [x1, y1, width, height],
+            ...
+        },
+        "parsed_content_list": [
+            "Text Box ID 0: [content]",
+            "Text Box ID 1: [content]",
+            ...,
+            "Icon Box ID X: [description]",
+            ...
+        ]
+    }
+
+Note: The parsed_content_list includes both text box contents and icon descriptions.
 """
 
 import fire

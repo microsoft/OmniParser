@@ -652,8 +652,6 @@ class Deploy:
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to commit or push changes: {e}")
             logger.error(f"Failed to commit or push changes: {e}")
-            import ipdb; ipdb.set_trace()
-            foo = 1
 
         github_actions_url = get_github_actions_url()
         gradio_server_url = get_gradio_server_url(instance_ip)
