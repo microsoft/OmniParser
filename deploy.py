@@ -474,7 +474,7 @@ def configure_ec2_instance(
         "sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose",
         # Docker cleanup and conflict resolution commands
         "sudo docker system prune -af --volumes",  # Clean up unused Docker resources
-        #"if sudo docker ps -a --filter 'name=omniparser-container' --format '{{.ID}}' | grep -q .; then sudo docker rm -f omniparser-container; fi"  # Remove conflicting container if it exists
+        "sudo docker rm -f omniparser-container || true",  # Remove conflicting container if it exists
     ]
 
 
