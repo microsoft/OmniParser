@@ -1,0 +1,40 @@
+name: Docker Build on EC2 Instance for OmniParser
+
+on:
+  push:
+    branches:
+      - {{ branch_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: SSH and Execute Build on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          command_timeout: "60m"
+          host: {{ host }}
+          username: {{ username }}
+          {% raw %}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          {% endraw %}
+          script: |
+            rm -rf {{ github_repo }} || true
+            git clone https://github.com/{{ github_path }}
+            cd {{ github_repo }}
+            git checkout {{ branch_name }}
+            git pull
+
+            # Stop and remove any existing containers
+            sudo docker stop {{ project_name }}-container || true
+            sudo docker rm {{ project_name }}-container || true
+
+            # Build the Docker image
+            sudo nvidia-docker build -t {{ project_name }} .
+
+            # Run the Docker container on the specified port
+            sudo docker run -d -p 7861:7861 --gpus all --name {{ project_name }}-container {{ project_name }}
+
