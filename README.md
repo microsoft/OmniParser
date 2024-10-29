@@ -56,6 +56,12 @@ To run gradio demo, simply run:
 python gradio_demo.py
 ```
 
+## Deploy to AWS
+
+To deploy OmniParser to EC2 on AWS via Github Actions:
+
+1. Fork this repository and clone your fork to your local machine.
+2. Follow the instructions at the top of [`deploy.py`](https://github.com/microsoft/OmniParser/blob/main/deploy.py).
 
 ## 📚 Citation
 Our technical report can be found [here](https://arxiv.org/abs/2408.00203).
