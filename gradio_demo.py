@@ -5,8 +5,17 @@ from PIL import Image
 import io
 import base64
 import json
+import numpy as np
 
 from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.float32):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)
 
 yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
@@ -67,7 +76,7 @@ def process(
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
-    parsed_content_list = '\n'.join(parsed_content_list)
+    #parsed_content_list = '\n'.join(parsed_content_list)
 
     # Combine text and bounding boxes into JSON-friendly format
     result = {
@@ -75,8 +84,8 @@ def process(
         "parsed_content_list": parsed_content_list,
     }
     
-    # Convert to JSON string format for return
-    result_json = json.dumps(result, indent=4)
+    # Convert to JSON string format for return using the custom encoder
+    result_json = json.dumps(result, indent=4, cls=NumpyEncoder)
     
     return image, result_json
 
