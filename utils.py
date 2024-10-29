@@ -380,7 +380,7 @@ def get_xywh_yolo(input):
     
 
 
-def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None, use_paddleocr=True):
+def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None, use_paddleocr=False):
     if use_paddleocr:
         result = paddle_ocr.ocr(image_path, cls=False)[0]
         coord = [item[0] for item in result]
