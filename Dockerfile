@@ -1,3 +1,24 @@
+# Dockerfile for OmniParser with GPU support and OpenGL libraries
+#
+# This Dockerfile is intended to create an environment with NVIDIA CUDA
+# support and the necessary dependencies to run the OmniParser project.
+# The configuration is designed to support applications that rely on
+# Python 3.12, OpenCV, Hugging Face transformers, and Gradio. Additionally,
+# it includes steps to pull large files from Git LFS and a script to
+# convert model weights from .safetensor to .pt format. The container
+# runs a Gradio server by default, exposed on port 7861.
+#
+# Base image: nvidia/cuda:12.3.1-devel-ubuntu22.04
+#
+# Key features:
+# - System dependencies for OpenGL to support graphical libraries.
+# - Miniconda for Python 3.12, allowing for environment management.
+# - Git Large File Storage (LFS) setup for handling large model files.
+# - Requirement file installation, including specific versions of
+#   OpenCV and Hugging Face Hub.
+# - Entrypoint script execution with Gradio server configuration for
+#   external access.
+
 FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
 
 # Install system dependencies with explicit OpenGL libraries

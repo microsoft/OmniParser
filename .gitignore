@@ -3,14 +3,8 @@ weights/icon_caption_florence
 weights/icon_detect/
 .gradio
 __pycache__
-
-# Swap files
 *.swp
-
-# Environment files
 .env
 .env.*
-
-# Environment
 venv/
 *.pem
