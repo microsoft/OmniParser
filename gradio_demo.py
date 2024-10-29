@@ -72,7 +72,19 @@ def process(
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
     parsed_content_list = '\n'.join(parsed_content_list)
-    return image, str(parsed_content_list)
+
+    # Combine text and bounding boxes into JSON-friendly format
+    parsed_content_with_boxes = [
+        {"text": content, "box": bbox}
+        for content, bbox in zip(parsed_content_list, label_coordinates)
+    ]
+    
+    # Convert to JSON string format for return
+    parsed_content_json = json.dumps(parsed_content_with_boxes, indent=4)
+    
+    return image, parsed_content_json
+
+    #return image, str(parsed_content_list)
 
 
 

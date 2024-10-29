@@ -13,6 +13,8 @@ import base64
 from io import BytesIO
 import os
 import shutil
+import json
+from datetime import datetime
 
 def predict(server_url: str, image_path: str, box_threshold: float = 0.05, iou_threshold: float = 0.1):
     """
@@ -26,6 +28,9 @@ def predict(server_url: str, image_path: str, box_threshold: float = 0.05, iou_t
     """
     client = Client(server_url)
     
+    # Generate a timestamp for unique file naming
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # Load and encode the image
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
@@ -54,10 +59,15 @@ def predict(server_url: str, image_path: str, box_threshold: float = 0.05, iou_t
         output_image, parsed_content = result
         
         logger.info("Prediction completed successfully")
-        logger.info(f"Parsed content:\n{parsed_content}")
+
+        # Save parsed content to JSON file
+        parsed_content_path = f"parsed_content_{timestamp}.json"
+        with open(parsed_content_path, "w") as json_file:
+            json.dump(parsed_content, json_file, indent=4)
+        logger.info(f"Parsed content saved to: {parsed_content_path}")
         
         # Save the output image
-        output_image_path = "output_image.png"
+        output_image_path = f"output_image_{timestamp}.png"
         if isinstance(output_image, dict) and 'url' in output_image:
             # Handle base64 encoded image
             img_data = base64.b64decode(output_image['url'].split(',')[1])
