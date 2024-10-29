@@ -1,16 +1,21 @@
-from typing import Optional
-
+from typing import Optional, Text, Tuple
 import gradio as gr
-import numpy as np
 import torch
 from PIL import Image
 import io
+import base64
+import json
+import numpy as np
 
-
-import base64, os
 from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
-import torch
-from PIL import Image
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.float32):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)
 
 yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
@@ -59,21 +64,31 @@ def process(
     image_input,
     box_threshold,
     iou_threshold
-) -> Optional[Image.Image]:
+) -> Tuple[Optional[Image.Image], Text]:
 
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
-    # import pdb; pdb.set_trace()
 
     ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
     text, ocr_bbox = ocr_bbox_rslt
-    # print('prompt:', prompt)
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
-    image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
-    print('finish processing')
-    parsed_content_list = '\n'.join(parsed_content_list)
-    return image, str(parsed_content_list)
 
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
+
+    # Convert base64 string to PIL Image
+    image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
+
+    print('finish processing')
+
+    # Combine text and bounding boxes into JSON-friendly format
+    result = {
+        "label_coordinates": label_coordinates,
+        "parsed_content_list": parsed_content_list,
+    }
+    
+    # Convert to JSON string format for return using the custom encoder
+    result_json = json.dumps(result, indent=4, cls=NumpyEncoder)
+    
+    return image, result_json
 
 
 with gr.Blocks() as demo:
