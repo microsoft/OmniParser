@@ -5,7 +5,7 @@ name: Docker Build on EC2 Instance for OmniParser
 on:
   push:
     branches:
-      - feat/deploy
+      - feat/deploy2
 
 jobs:
   build:
@@ -27,7 +27,7 @@ jobs:
             rm -rf OmniParser || true
             git clone https://github.com/OpenAdaptAI/OmniParser
             cd OmniParser
-            git checkout feat/deploy
+            git checkout feat/deploy2
             git pull
 
             # Stop and remove any existing containers

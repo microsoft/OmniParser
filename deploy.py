@@ -474,7 +474,7 @@ def configure_ec2_instance(
         "sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose",
         # Docker cleanup and conflict resolution commands
         "sudo docker system prune -af --volumes",  # Clean up unused Docker resources
-        #"if sudo docker ps -a --filter 'name=omniparser-container' --format '{{.ID}}' | grep -q .; then sudo docker rm -f omniparser-container; fi"  # Remove conflicting container if it exists
+        "sudo docker rm -f omniparser-container || true",  # Remove conflicting container if it exists
     ]
 
 
@@ -652,8 +652,6 @@ class Deploy:
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to commit or push changes: {e}")
             logger.error(f"Failed to commit or push changes: {e}")
-            import ipdb; ipdb.set_trace()
-            foo = 1
 
         github_actions_url = get_github_actions_url()
         gradio_server_url = get_gradio_server_url(instance_ip)
