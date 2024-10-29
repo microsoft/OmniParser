@@ -660,7 +660,7 @@ class Deploy:
         logger.info("Deployment process completed.")
         logger.info(f"Check the GitHub Actions at {github_actions_url}.")
         logger.info("Once the action is complete, run:")
-        logger.info(f"    python client.py {gradio_server_url}")
+        logger.info(f"    python client.py {gradio_server_url} <path>/<to>/<image.png>")
 
     @staticmethod
     def pause(project_name: str = config.PROJECT_NAME) -> None:
