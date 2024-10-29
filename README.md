@@ -17,15 +17,16 @@
 
 ### :rocket: Docker Quick Start
 
-# Prerequisites:
-# - CUDA-enabled GPU
-# - NVIDIA Container Toolkit installed (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
-
+Prerequisites:
+- CUDA-enabled GPU
+- NVIDIA Container Toolkit installed (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+```
 # Build the image (requires CUDA)
 sudo nvidia-docker build -t omniparser .
 
 # Run the image
 sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
+```
 
 ## Install 
 Install environment:
