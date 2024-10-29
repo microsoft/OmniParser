@@ -68,15 +68,16 @@ def process(
 
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
-    # import pdb; pdb.set_trace()
 
     ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9})
     text, ocr_bbox = ocr_bbox_rslt
-    # print('prompt:', prompt)
+
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
+
+    # Convert base64 string to PIL Image
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
+
     print('finish processing')
-    #parsed_content_list = '\n'.join(parsed_content_list)
 
     # Combine text and bounding boxes into JSON-friendly format
     result = {
@@ -88,7 +89,6 @@ def process(
     result_json = json.dumps(result, indent=4, cls=NumpyEncoder)
     
     return image, result_json
-
 
 
 with gr.Blocks() as demo:

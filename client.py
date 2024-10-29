@@ -65,50 +65,24 @@ def predict(server_url: str, image_path: str, box_threshold: float = 0.05, iou_t
 
         # Extract label_coordinates and parsed_content_list
         label_coordinates = result_data['label_coordinates']
-        parsed_content_list = result_data['parsed_content_list'].split('\n')
+        parsed_content_list = result_data['parsed_content_list']
 
-        # Combine coordinates with content
-        combined_result = []
-        for coord, content in zip(label_coordinates, parsed_content_list):
-            combined_result.append({
-                "text": content,
-                "box": coord
-            })
+        logger.info(f"{label_coordinates=}")
+        logger.info(f"{parsed_content_list=}")
 
-        # Save parsed content to JSON file
-        parsed_content_path = f"parsed_content_{timestamp}.json"
-        with open(parsed_content_path, "w") as json_file:
-            json.dump(combined_result, json_file, indent=4)
-        logger.info(f"Parsed content saved to: {parsed_content_path}")
+        # Save result data to JSON file
+        result_data_path = f"result_data_{timestamp}.json"
+        with open(result_data_path, "w") as json_file:
+            json.dump(result_data, json_file, indent=4)
+        logger.info(f"Parsed content saved to: {result_data_path}")
         
         # Save the output image
         output_image_path = f"output_image_{timestamp}.png"
-        if isinstance(output_image, dict) and 'url' in output_image:
-            # Handle base64 encoded image
-            img_data = base64.b64decode(output_image['url'].split(',')[1])
-            with open(output_image_path, 'wb') as f:
-                f.write(img_data)
-        elif isinstance(output_image, str):
-            if output_image.startswith('data:image'):
-                # Handle base64 encoded image string
-                img_data = base64.b64decode(output_image.split(',')[1])
-                with open(output_image_path, 'wb') as f:
-                    f.write(img_data)
-            elif os.path.exists(output_image):
-                # Handle file path
-                shutil.copy(output_image, output_image_path)
-            else:
-                logger.warning(f"Unexpected output_image format: {output_image}")
-        elif isinstance(output_image, Image.Image):
-            output_image.save(output_image_path)
-        else:
-            logger.warning(f"Unexpected output_image format: {type(output_image)}")
-            logger.warning(f"Output image content: {output_image[:100]}...")  # Log the first 100 characters
-        
-        if os.path.exists(output_image_path):
+        if isinstance(output_image, str) and os.path.exists(output_image):
+            shutil.copy(output_image, output_image_path)
             logger.info(f"Output image saved to: {output_image_path}")
         else:
-            logger.warning(f"Failed to save output image to: {output_image_path}")
+            logger.warning(f"Unexpected output_image format or file not found: {output_image}")
     
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
