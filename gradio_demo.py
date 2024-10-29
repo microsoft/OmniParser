@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Text, Tuple
 import gradio as gr
 import torch
 from PIL import Image
@@ -55,7 +55,7 @@ def process(
     image_input,
     box_threshold,
     iou_threshold
-) -> Optional[Image.Image]:
+) -> Tuple[Optional[Image.Image], Text]:
 
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
@@ -70,17 +70,15 @@ def process(
     parsed_content_list = '\n'.join(parsed_content_list)
 
     # Combine text and bounding boxes into JSON-friendly format
-    parsed_content_with_boxes = [
-        {"text": content, "box": bbox}
-        for content, bbox in zip(parsed_content_list, label_coordinates)
-    ]
+    result = {
+        "label_coordinates": label_coordinates,
+        "parsed_content_list": parsed_content_list,
+    }
     
     # Convert to JSON string format for return
-    parsed_content_json = json.dumps(parsed_content_with_boxes, indent=4)
+    result_json = json.dumps(result, indent=4)
     
-    return image, parsed_content_json
-
-    #return image, str(parsed_content_list)
+    return image, result_json
 
 
 

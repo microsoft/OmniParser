@@ -56,14 +56,29 @@ def predict(server_url: str, image_path: str, box_threshold: float = 0.05, iou_t
         )
 
         # Process and log the results
-        output_image, parsed_content = result
+        output_image, result_json = result
         
         logger.info("Prediction completed successfully")
+
+        # Parse the JSON string into a Python object
+        result_data = json.loads(result_json)
+
+        # Extract label_coordinates and parsed_content_list
+        label_coordinates = result_data['label_coordinates']
+        parsed_content_list = result_data['parsed_content_list'].split('\n')
+
+        # Combine coordinates with content
+        combined_result = []
+        for coord, content in zip(label_coordinates, parsed_content_list):
+            combined_result.append({
+                "text": content,
+                "box": coord
+            })
 
         # Save parsed content to JSON file
         parsed_content_path = f"parsed_content_{timestamp}.json"
         with open(parsed_content_path, "w") as json_file:
-            json.dump(parsed_content, json_file, indent=4)
+            json.dump(combined_result, json_file, indent=4)
         logger.info(f"Parsed content saved to: {parsed_content_path}")
         
         # Save the output image
