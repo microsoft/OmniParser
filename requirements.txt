@@ -7,8 +7,7 @@ transformers
 ultralytics==8.1.24
 azure-identity
 numpy
-opencv-python
-opencv-python-headless
+opencv-python-headless==4.8.1.78
 gradio
 dill
 accelerate
