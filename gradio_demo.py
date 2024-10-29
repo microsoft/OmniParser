@@ -12,8 +12,8 @@ from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, ge
 import torch
 from PIL import Image
 
-yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
-caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
+yolo_model = get_yolo_model(model_path=os.path.join("weights", "icon_detect", "best.pt"))
+caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path=os.path.join("weights", "icon_caption_florence"))
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
@@ -47,7 +47,7 @@ MARKDOWN = """
     </a>
 </div>
 
-OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
+OmniParser is a screen parsing tool to convert general GUI screen to structured elements.
 """
 
 DEVICE = torch.device('cuda')
@@ -61,7 +61,7 @@ def process(
     iou_threshold
 ) -> Optional[Image.Image]:
 
-    image_save_path = 'imgs/saved_image_demo.png'
+    image_save_path = os.path.join('imgs', 'saved_image_demo.png')
     image_input.save(image_save_path)
     # import pdb; pdb.set_trace()
 

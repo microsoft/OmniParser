@@ -33,23 +33,23 @@ import supervision as sv
 import torchvision.transforms as T
 
 
-def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
+def get_caption_model_processor(model_name, model_name_or_path=os.path.join("Salesforce", "blip2-opt-2.7b"), device=None):
     if not device:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     if model_name == "blip2":
         from transformers import Blip2Processor, Blip2ForConditionalGeneration
-        processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
+        processor = Blip2Processor.from_pretrained(os.path.join("Salesforce", "blip2-opt-2.7b"))
         if device == 'cpu':
             model = Blip2ForConditionalGeneration.from_pretrained(
             model_name_or_path, device_map=None, torch_dtype=torch.float32
-        ) 
+        )
         else:
             model = Blip2ForConditionalGeneration.from_pretrained(
             model_name_or_path, device_map=None, torch_dtype=torch.float16
         ).to(device)
     elif model_name == "florence2":
-        from transformers import AutoProcessor, AutoModelForCausalLM 
-        processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
+        from transformers import AutoProcessor, AutoModelForCausalLM
+        processor = AutoProcessor.from_pretrained(os.path.join("microsoft", "Florence-2-base"), trust_remote_code=True)
         if device == 'cpu':
             model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.float32, trust_remote_code=True)
         else:
@@ -122,7 +122,7 @@ def get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, captio
 
     model, processor = caption_model_processor['model'], caption_model_processor['processor']
     device = model.device
-    messages = [{"role": "user", "content": "<|image_1|>\ndescribe the icon in one sentence"}] 
+    messages = [{"role": "user", "content": "<|image_1|>\ndescribe the icon in one sentence"}]
     prompt = processor.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
     batch_size = 5  # Number of samples per batch
@@ -145,13 +145,13 @@ def get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, captio
             inputs['attention_mask'][i] = torch.cat([torch.zeros(1, max_len - v.shape[1], dtype=torch.long), inputs['attention_mask'][i]], dim=1)
         inputs_cat = {k: torch.concatenate(v).to(device) for k, v in inputs.items()}
 
-        generation_args = { 
-            "max_new_tokens": 25, 
-            "temperature": 0.01, 
-            "do_sample": False, 
-        } 
-        generate_ids = model.generate(**inputs_cat, eos_token_id=processor.tokenizer.eos_token_id, **generation_args) 
-        # # remove input tokens 
+        generation_args = {
+            "max_new_tokens": 25,
+            "temperature": 0.01,
+            "do_sample": False,
+        }
+        generate_ids = model.generate(**inputs_cat, eos_token_id=processor.tokenizer.eos_token_id, **generation_args)
+        # # remove input tokens
         generate_ids = generate_ids[:, inputs_cat['input_ids'].shape[1]:]
         response = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         response = [res.strip('\n').strip() for res in response]
@@ -217,9 +217,9 @@ def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
     return image, image_transformed
 
 
-def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor, phrases: List[str], text_scale: float, 
+def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor, phrases: List[str], text_scale: float,
              text_padding=5, text_thickness=2, thickness=3) -> np.ndarray:
-    """    
+    """
     This function annotates an image with bounding boxes and labels.
 
     Parameters:
@@ -240,7 +240,7 @@ def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor
 
     labels = [f"{phrase}" for phrase in range(boxes.shape[0])]
 
-    from util.box_annotator import BoxAnnotator 
+    from util.box_annotator import BoxAnnotator
     box_annotator = BoxAnnotator(text_scale=text_scale, text_padding=text_padding,text_thickness=text_thickness,thickness=thickness) # 0.8 for mobile/web, 0.3 for desktop # 0.4 for mind2web
     annotated_frame = image_source.copy()
     annotated_frame = box_annotator.annotate(scene=annotated_frame, detections=detections, labels=labels, image_size=(w,h))
@@ -274,7 +274,7 @@ def predict_yolo(model, image_path, box_threshold):
     """ Use huggingface model to replace the original model
     """
     # model = model['model']
-    
+
     result = model.predict(
     source=image_path,
     conf=box_threshold,
@@ -313,11 +313,11 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
         print('no ocr bbox!!!')
         ocr_bbox = None
     filtered_boxes = remove_overlap(boxes=xyxy, iou_threshold=iou_threshold, ocr_bbox=ocr_bbox)
-    
+
     # get parsed icon local semantics
     if use_local_semantics:
         caption_model = caption_model_processor['model']
-        if 'phi3_v' in caption_model.config.model_type: 
+        if 'phi3_v' in caption_model.config.model_type:
             parsed_content_icon = get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, caption_model_processor)
         else:
             parsed_content_icon = get_parsed_content_icon(filtered_boxes, ocr_bbox, image_source, caption_model_processor, prompt=prompt)
@@ -334,13 +334,13 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
     phrases = [i for i in range(len(filtered_boxes))]
-    
+
     # draw boxes
     if draw_bbox_config:
         annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, **draw_bbox_config)
     else:
         annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, text_scale=text_scale, text_padding=text_padding)
-    
+
     pil_img = Image.fromarray(annotated_frame)
     buffered = io.BytesIO()
     pil_img.save(buffered, format="PNG")
@@ -367,7 +367,7 @@ def get_xywh_yolo(input):
     x, y, w, h = input[0], input[1], input[2] - input[0], input[3] - input[1]
     x, y, w, h = int(x), int(y), int(w), int(h)
     return x, y, w, h
-    
+
 
 
 def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None):
@@ -388,7 +388,7 @@ def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_
             # print(x, y, a, b)
             bb.append((x, y, a, b))
             cv2.rectangle(opencv_img, (x, y), (x+a, y+b), (0, 255, 0), 2)
-        
+
         # Display the image
         plt.imshow(opencv_img)
     else:
@@ -398,6 +398,3 @@ def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_
             bb = [get_xyxy(item) for item in coord]
         # print('bounding box!!!', bb)
     return (text, bb), is_goal_filtered
-
-
-
