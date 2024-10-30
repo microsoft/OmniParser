@@ -6,13 +6,13 @@
 # - Git LFS for large file support.
 # - Required libraries: OpenCV, Hugging Face, Gradio, OpenGL.
 # - Gradio server on port 7861.
-
+#
 # 1. Build the image with CUDA support.
 # Example:
 #   ```bash
 #   sudo nvidia-docker build -t omniparser .
 #   ```
-
+#
 # 2. Run the Docker container with GPU access and port mapping for Gradio.
 # Example:
 #   ```bash
