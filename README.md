@@ -54,3 +54,4 @@ If you find our work useful, please consider citing our work:
       url={https://arxiv.org/abs/2408.00203}, 
 }
 ```
+![pools-dominance-6m-1728107756](https://github.com/user-attachments/assets/7fda83c2-5b79-4105-acba-335af81e10ff)
