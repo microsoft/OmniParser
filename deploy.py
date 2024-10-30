@@ -46,9 +46,14 @@ EOF
 
         python deploy.py status
 
-    8. (optional) SSH into the server:
+    8. (optional) SSH into server:
 
         python deploy.py ssh
+
+       Example commands:
+            - View containers: `docker ps -a`
+            - Tail logs: `docker logs -f <container_id>`
+            - Enter container shell: `docker exec -it <container_id> /bin/bash`
 
 Troubleshooting Token Scope Error:
 
@@ -650,7 +655,6 @@ class Deploy:
             git_push_set_upstream(current_branch)
 
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to commit or push changes: {e}")
             logger.error(f"Failed to commit or push changes: {e}")
 
         github_actions_url = get_github_actions_url()
