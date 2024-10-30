@@ -7,6 +7,18 @@
 # - Required libraries: OpenCV, Hugging Face, Gradio, OpenGL.
 # - Gradio server on port 7861.
 
+# 1. Build the image with CUDA support.
+# Example:
+#   ```bash
+#   sudo nvidia-docker build -t omniparser .
+#   ```
+
+# 2. Run the Docker container with GPU access and port mapping for Gradio.
+# Example:
+#   ```bash
+#   sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
+#   ```
+
 FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
 
 # Install system dependencies with explicit OpenGL libraries
