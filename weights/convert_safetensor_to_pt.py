@@ -1,9 +1,12 @@
 import torch
 from ultralytics.nn.tasks import DetectionModel
 from safetensors.torch import load_file
+from pathlib import Path
 
-tensor_dict = load_file("weights/icon_detect/model.safetensors")
+weights_path = Path("weights") / "icon_detect"
 
-model = DetectionModel('weights/icon_detect/model.yaml')
+tensor_dict = load_file(weights_path / "model.safetensors")
+
+model = DetectionModel(str(weights_path / "model.yaml"))
 model.load_state_dict(tensor_dict)
-torch.save({'model':model}, 'weights/icon_detect/best.pt')
+torch.save({'model': model}, weights_path / "model.pt")
