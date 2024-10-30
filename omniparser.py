@@ -6,12 +6,13 @@ from typing import Dict, Tuple, List
 import io
 import base64
 import os
+from pathlib import Path
 
 
 config = {
     'som_model_path': 'finetuned_icon_detect.pt',
     'device': 'cpu',
-    'caption_model_path': os.path.join("Salesforce", "blip2-opt-2.7b"),
+    'caption_model_path': Path("Salesforce") / "blip2-opt-2.7b",
     'draw_bbox_config': {
         'text_scale': 0.8,
         'text_thickness': 2,
@@ -51,7 +52,7 @@ class Omniparser(object):
         return [image, return_list]
 
 parser = Omniparser(config)
-image_path = os.path.join('examples', 'pc_1.png')
+image_path = Path("examples") / "pc_1.png"
 
 #  time the parser
 import time
