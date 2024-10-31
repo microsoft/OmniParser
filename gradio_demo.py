@@ -90,7 +90,7 @@ with gr.Blocks() as demo:
             iou_threshold_component = gr.Slider(
                 label='IOU Threshold', minimum=0.01, maximum=1.0, step=0.01, value=0.1)
             use_paddleocr_component = gr.Checkbox(
-                label='Use PaddleOCR', default=True)
+                label='Use PaddleOCR', value=True)
             submit_button_component = gr.Button(
                 value='Submit', variant='primary')
         with gr.Column():

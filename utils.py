@@ -411,7 +411,7 @@ def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_
         elif output_bb_format == 'xyxy':
             bb = [get_xyxy(item) for item in coord]
         # print('bounding box!!!', bb)
-    return (text, bb), is_goal_filtered
+    return (text, bb), goal_filtering
 
 
 
