@@ -18,7 +18,17 @@ import numpy as np
 # %matplotlib inline
 from matplotlib import pyplot as plt
 import easyocr
+from paddleocr import PaddleOCR
 reader = easyocr.Reader(['en'])
+paddle_ocr = PaddleOCR(
+    lang='en',  # other lang also available
+    use_angle_cls=False,
+    use_gpu=False,  # using cuda will conflict with pytorch in the same process
+    show_log=False,
+    max_batch_size=1024,
+    use_dilation=True,  # improves accuracy
+    det_db_score_mode='slow',  # improves accuracy
+    rec_batch_num=1024)
 import time
 import base64
 
@@ -370,14 +380,18 @@ def get_xywh_yolo(input):
     
 
 
-def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None):
-    if easyocr_args is None:
-        easyocr_args = {}
-    result = reader.readtext(image_path, **easyocr_args)
-    is_goal_filtered = False
-    # print('goal filtering pred:', result[-5:])
-    coord = [item[0] for item in result]
-    text = [item[1] for item in result]
+def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None, use_paddleocr=False):
+    if use_paddleocr:
+        result = paddle_ocr.ocr(image_path, cls=False)[0]
+        coord = [item[0] for item in result]
+        text = [item[1][0] for item in result]
+    else:  # EasyOCR
+        if easyocr_args is None:
+            easyocr_args = {}
+        result = reader.readtext(image_path, **easyocr_args)
+        # print('goal filtering pred:', result[-5:])
+        coord = [item[0] for item in result]
+        text = [item[1] for item in result]
     # read the image using cv2
     if display_img:
         opencv_img = cv2.imread(image_path)
