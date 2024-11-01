@@ -1,5 +1,7 @@
 # Dockerfile for OmniParser with GPU and OpenGL support.
 #
+# Author: Richard Abrich (@OpenAdaptAI)
+#
 # Base: nvidia/cuda:12.3.1-devel-ubuntu22.04
 # Features:
 # - Python 3.12 with Miniconda environment.
@@ -8,16 +10,14 @@
 # - Gradio server on port 7861.
 #
 # 1. Build the image with CUDA support.
-# Example:
-#   ```bash
-#   sudo nvidia-docker build -t omniparser .
-#   ```
+# ```
+# sudo nvidia-docker build -t omniparser .
+# ```
 #
 # 2. Run the Docker container with GPU access and port mapping for Gradio.
-# Example:
-#   ```bash
-#   sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
-#   ```
+# ```bash
+# sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
+# ```
 
 FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
 
