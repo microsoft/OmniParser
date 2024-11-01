@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 import io
 
-import base64, os
+import base64, json, os
 from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
@@ -77,7 +77,8 @@ def process(
         "parsed_content_list": parsed_content_list,
         "label_coordinates": label_coordinates,
     }
-    return image, str(output_dict)
+    combined_text_output = json.dumps(output_dict, indent=2)
+    return image, combined_text_output
 
 
 with gr.Blocks() as demo:
