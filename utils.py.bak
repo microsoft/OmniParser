@@ -297,19 +297,19 @@ def predict_yolo(model, image_path, box_threshold):
     return boxes, conf, phrases
 
 
-def get_som_labeled_img(img_path, model=None, BOX_THRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None):
+def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None):
     """ ocr_bbox: list of xyxy format bbox
     """
     TEXT_PROMPT = "clickable buttons on the screen"
-    # BOX_THRESHOLD = 0.02 # 0.05/0.02 for web and 0.1 for mobile
+    # BOX_TRESHOLD = 0.02 # 0.05/0.02 for web and 0.1 for mobile
     TEXT_TRESHOLD = 0.01 # 0.9 # 0.01
     image_source = Image.open(img_path).convert("RGB")
     w, h = image_source.size
     # import pdb; pdb.set_trace()
     if False: # TODO
-        xyxy, logits, phrases = predict(model=model, image=image_source, caption=TEXT_PROMPT, box_threshold=BOX_THRESHOLD, text_threshold=TEXT_TRESHOLD)
+        xyxy, logits, phrases = predict(model=model, image=image_source, caption=TEXT_PROMPT, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD)
     else:
-        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_THRESHOLD)
+        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_TRESHOLD)
     xyxy = xyxy / torch.Tensor([w, h, w, h]).to(xyxy.device)
     image_source = np.asarray(image_source)
     phrases = [str(i) for i in range(len(phrases))]

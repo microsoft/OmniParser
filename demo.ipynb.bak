@@ -96,7 +96,7 @@
     "    'text_padding': 3,\n",
     "    'thickness': 3,\n",
     "}\n",
-    "BOX_THRESHOLD = 0.03\n",
+    "BOX_TRESHOLD = 0.03\n",
     "\n",
     "image = Image.open(image_path)\n",
     "image_rgb = image.convert('RGB')\n",
@@ -104,7 +104,7 @@
     "ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=True)\n",
     "text, ocr_bbox = ocr_bbox_rslt\n",
     "\n",
-    "dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, som_model, BOX_THRESHOLD = BOX_THRESHOLD, output_coord_in_ratio=False, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.1)\n",
+    "dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, som_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=False, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.1)\n",
     "\n",
     "\n"
    ]
