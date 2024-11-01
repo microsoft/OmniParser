@@ -14,6 +14,8 @@ from PIL import Image
 
 yolo_model = get_yolo_model(model_path='weights/icon_detect/best.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
+# caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
+
 platform = 'pc'
 if platform == 'pc':
     draw_bbox_config = {
