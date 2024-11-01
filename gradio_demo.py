@@ -73,7 +73,11 @@ def process(
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
 
     print('finish processing')
-    return image, str(parsed_content_list), str(label_coordinates)
+    output_dict = {
+        "parsed_content_list": parsed_content_list,
+        "label_coordinates": label_coordinates,
+    }
+    return image, str(output_dict)
 
 
 with gr.Blocks() as demo:
