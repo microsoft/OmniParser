@@ -74,12 +74,10 @@ def process(
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold)
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
-    print('finish processing')
-    output_dict = {
+    combined_text_output = json.dumps({
         "parsed_content_list": parsed_content_list,
         "label_coordinates": label_coordinates,
-    }
-    combined_text_output = json.dumps(output_dict, indent=2)
+    }, indent=2)
     return image, combined_text_output
 
 
