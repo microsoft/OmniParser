@@ -17,7 +17,7 @@ config = {
         'text_padding': 3,
         'thickness': 3,
     },
-    'BOX_TRESHOLD': 0.05
+    'BOX_THRESHOLD': 0.05
 }
 
 
@@ -35,8 +35,8 @@ class Omniparser(object):
         text, ocr_bbox = ocr_bbox_rslt
 
         draw_bbox_config = self.config['draw_bbox_config']
-        BOX_TRESHOLD = self.config['BOX_TRESHOLD']
-        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, self.som_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=False, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=None, ocr_text=text,use_local_semantics=False)
+        BOX_THRESHOLD = self.config['BOX_THRESHOLD']
+        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, self.som_model, BOX_THRESHOLD = BOX_THRESHOLD, output_coord_in_ratio=False, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=None, ocr_text=text,use_local_semantics=False)
         
         image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
         # formating output
