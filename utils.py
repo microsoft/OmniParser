@@ -280,7 +280,7 @@ def predict(model, image, caption, box_threshold, text_threshold):
     return boxes, logits, phrases
 
 
-def predict_yolo(model, image_path, box_threshold):
+def predict_yolo(model, image_path, box_threshold, imgsz):
     """ Use huggingface model to replace the original model
     """
     # model = model['model']
@@ -288,6 +288,7 @@ def predict_yolo(model, image_path, box_threshold):
     result = model.predict(
     source=image_path,
     conf=box_threshold,
+    imgsz=imgsz
     # iou=0.5, # default 0.7
     )
     boxes = result[0].boxes.xyxy#.tolist() # in pixel space
@@ -297,7 +298,7 @@ def predict_yolo(model, image_path, box_threshold):
     return boxes, conf, phrases
 
 
-def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None):
+def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None,imgsz=640):
     """ ocr_bbox: list of xyxy format bbox
     """
     TEXT_PROMPT = "clickable buttons on the screen"
@@ -309,7 +310,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     if False: # TODO
         xyxy, logits, phrases = predict(model=model, image=image_source, caption=TEXT_PROMPT, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD)
     else:
-        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_TRESHOLD)
+        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_TRESHOLD, imgsz=imgsz)
     xyxy = xyxy / torch.Tensor([w, h, w, h]).to(xyxy.device)
     image_source = np.asarray(image_source)
     phrases = [str(i) for i in range(len(phrases))]
