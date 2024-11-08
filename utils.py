@@ -18,7 +18,17 @@ import numpy as np
 # %matplotlib inline
 from matplotlib import pyplot as plt
 import easyocr
+from paddleocr import PaddleOCR
 reader = easyocr.Reader(['en'])
+paddle_ocr = PaddleOCR(
+    lang='en',  # other lang also available
+    use_angle_cls=False,
+    use_gpu=False,  # using cuda will conflict with pytorch in the same process
+    show_log=False,
+    max_batch_size=1024,
+    use_dilation=True,  # improves accuracy
+    det_db_score_mode='slow',  # improves accuracy
+    rec_batch_num=1024)
 import time
 import base64
 
@@ -64,6 +74,7 @@ def get_yolo_model(model_path):
     return model
 
 
+@torch.inference_mode()
 def get_parsed_content_icon(filtered_boxes, ocr_bbox, image_source, caption_model_processor, prompt=None):
     to_pil = ToPILImage()
     if ocr_bbox:
@@ -269,7 +280,7 @@ def predict(model, image, caption, box_threshold, text_threshold):
     return boxes, logits, phrases
 
 
-def predict_yolo(model, image_path, box_threshold):
+def predict_yolo(model, image_path, box_threshold, imgsz):
     """ Use huggingface model to replace the original model
     """
     # model = model['model']
@@ -277,6 +288,7 @@ def predict_yolo(model, image_path, box_threshold):
     result = model.predict(
     source=image_path,
     conf=box_threshold,
+    imgsz=imgsz
     # iou=0.5, # default 0.7
     )
     boxes = result[0].boxes.xyxy#.tolist() # in pixel space
@@ -286,7 +298,7 @@ def predict_yolo(model, image_path, box_threshold):
     return boxes, conf, phrases
 
 
-def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None):
+def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None,imgsz=640):
     """ ocr_bbox: list of xyxy format bbox
     """
     TEXT_PROMPT = "clickable buttons on the screen"
@@ -298,7 +310,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     if False: # TODO
         xyxy, logits, phrases = predict(model=model, image=image_source, caption=TEXT_PROMPT, box_threshold=BOX_TRESHOLD, text_threshold=TEXT_TRESHOLD)
     else:
-        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_TRESHOLD)
+        xyxy, logits, phrases = predict_yolo(model=model, image_path=img_path, box_threshold=BOX_TRESHOLD, imgsz=imgsz)
     xyxy = xyxy / torch.Tensor([w, h, w, h]).to(xyxy.device)
     image_source = np.asarray(image_source)
     phrases = [str(i) for i in range(len(phrases))]
@@ -369,14 +381,18 @@ def get_xywh_yolo(input):
     
 
 
-def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None):
-    if easyocr_args is None:
-        easyocr_args = {}
-    result = reader.readtext(image_path, **easyocr_args)
-    is_goal_filtered = False
-    # print('goal filtering pred:', result[-5:])
-    coord = [item[0] for item in result]
-    text = [item[1] for item in result]
+def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_filtering=None, easyocr_args=None, use_paddleocr=False):
+    if use_paddleocr:
+        result = paddle_ocr.ocr(image_path, cls=False)[0]
+        coord = [item[0] for item in result]
+        text = [item[1][0] for item in result]
+    else:  # EasyOCR
+        if easyocr_args is None:
+            easyocr_args = {}
+        result = reader.readtext(image_path, **easyocr_args)
+        # print('goal filtering pred:', result[-5:])
+        coord = [item[0] for item in result]
+        text = [item[1] for item in result]
     # read the image using cv2
     if display_img:
         opencv_img = cv2.imread(image_path)
@@ -396,7 +412,7 @@ def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_
         elif output_bb_format == 'xyxy':
             bb = [get_xyxy(item) for item in coord]
         # print('bounding box!!!', bb)
-    return (text, bb), is_goal_filtered
+    return (text, bb), goal_filtering
 
 
 
