@@ -9,7 +9,7 @@
 #
 # 1. Build the image with CUDA support.
 # ```
-# sudo nvidia-docker build -t omniparser .
+# sudo docker build -t omniparser .
 # ```
 #
 # 2. Run the Docker container with GPU access and port mapping for Gradio.
