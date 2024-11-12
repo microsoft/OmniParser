@@ -1,7 +1,5 @@
 # Dockerfile for OmniParser with GPU and OpenGL support.
 #
-# Author: Richard Abrich (@OpenAdaptAI)
-#
 # Base: nvidia/cuda:12.3.1-devel-ubuntu22.04
 # Features:
 # - Python 3.12 with Miniconda environment.
@@ -18,25 +16,17 @@
 # ```bash
 # sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
 # ```
+#
+# Author: Richard Abrich (richard@openadapt.ai)
 
 FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
 
 # Install system dependencies with explicit OpenGL libraries
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    git \
     git-lfs \
     wget \
     libgl1 \
     libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    libglu1-mesa \
-    libglib2.0-0 \
-    libsm6 \
-    libxrender1 \
-    libxext6 \
-    python3-opencv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install

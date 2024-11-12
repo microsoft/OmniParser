@@ -24,6 +24,15 @@ EOF
 
         python deploy.py start
 
+       You may see the following error:
+
+        botocore.exceptions.ClientError: An error occurred (OptInRequired) when
+        calling the RunInstances operation: In order to use this AWS
+        Marketplace product you need to accept terms and subscribe. To do so
+        please visit https://aws.amazon.com/marketplace/pp?sku=64g24n0wem7a8nuhfum3097vb
+
+       Open the specified URL in the browser and accept the terms, then try again.
+
     4. Wait for the build to succeed in Github actions (see console output for URL)
 
     5. Open the gradio interface (see console output for URL) and test it out.
@@ -125,8 +134,8 @@ class Config(BaseSettings):
     GITHUB_TOKEN: str
     PROJECT_NAME: str
 
-    AWS_EC2_AMI: str = "ami-0f9c346cdcac09fb5"  # Deep Learning AMI GPU PyTorch 2.0.1 (Ubuntu 20.04) 20230827
-    AWS_EC2_DISK_SIZE: int = 100  # GB
+    AWS_EC2_AMI: str = "ami-06835d15c4de57810"
+    AWS_EC2_DISK_SIZE: int = 128  # GB
     #AWS_EC2_INSTANCE_TYPE: str = "p3.2xlarge"  # (V100 16GB $3.06/hr x86_64)
     AWS_EC2_INSTANCE_TYPE: str = "g4dn.xlarge"  # (T4 16GB $0.526/hr x86_64)
     AWS_EC2_USER: str = "ubuntu"
@@ -422,9 +431,9 @@ def deploy_ec2_instance(
 def configure_ec2_instance(
     instance_id: str | None = None,
     instance_ip: str | None = None,
-    max_ssh_retries: int = 10,
-    ssh_retry_delay: int = 10,
-    max_cmd_retries: int = 10,
+    max_ssh_retries: int = 20,
+    ssh_retry_delay: int = 20,
+    max_cmd_retries: int = 20,
     cmd_retry_delay: int = 30,
 ) -> tuple[str | None, str | None]:
     """
@@ -433,9 +442,9 @@ def configure_ec2_instance(
     Args:
         instance_id (str | None): The ID of the instance to configure. If None, a new instance will be deployed. Defaults to None.
         instance_ip (str | None): The IP address of the instance. Must be provided if instance_id is manually passed. Defaults to None.
-        max_ssh_retries (int): Maximum number of SSH connection retries. Defaults to 10.
-        ssh_retry_delay (int): Delay between SSH connection retries in seconds. Defaults to 10.
-        max_cmd_retries (int): Maximum number of command execution retries. Defaults to 10.
+        max_ssh_retries (int): Maximum number of SSH connection retries. Defaults to 20.
+        ssh_retry_delay (int): Delay between SSH connection retries in seconds. Defaults to 20.
+        max_cmd_retries (int): Maximum number of command execution retries. Defaults to 20.
         cmd_retry_delay (int): Delay between command execution retries in seconds. Defaults to 30.
 
     Returns:
@@ -637,6 +646,9 @@ class Deploy:
             config.GITHUB_OWNER, config.GITHUB_REPO, config.GITHUB_TOKEN,
         )
 
+        # Use the `ssh` method to connect and execute instance setup commands
+        Deploy.ssh(non_interactive=True)
+
         # Add, commit, and push the workflow file changes, setting the upstream branch
         try:
             # Stage the workflow file
@@ -752,12 +764,13 @@ class Deploy:
                 logger.info(f"Instance ID: {instance.id}, State: {instance.state['Name']}, HTTP URL: Not available (no public IP)")
 
     @staticmethod
-    def ssh(project_name: str = config.PROJECT_NAME) -> None:
+    def ssh(project_name: str = config.PROJECT_NAME, non_interactive: bool = False) -> None:
         """
-        Establishes an SSH connection to the EC2 instance associated with the specified project name using subprocess.
+        Establishes an SSH connection to the EC2 instance associated with the specified project name.
 
         Args:
             project_name (str): The project name used to tag the instance. Defaults to config.PROJECT_NAME.
+            non_interactive (bool): If True, ensures a full interactive login simulation. Defaults to False.
 
         Returns:
             None
@@ -773,14 +786,29 @@ class Deploy:
         for instance in instances:
             logger.info(f"Attempting to SSH into instance: ID - {instance.id}, IP - {instance.public_ip_address}")
 
-            # Build the SSH command
-            ssh_command = [
-                "ssh",
-                "-i", config.AWS_EC2_KEY_PATH,
-                f"{config.AWS_EC2_USER}@{instance.public_ip_address}"
-            ]
+            if non_interactive:
+                # Simulate full login by forcing all initialization scripts
+                ssh_command = [
+                    "ssh",
+                    "-o", "StrictHostKeyChecking=no",  # Automatically accept new host keys
+                    "-o", "UserKnownHostsFile=/dev/null",  # Prevent writing to known_hosts
+                    "-i", config.AWS_EC2_KEY_PATH,
+                    f"{config.AWS_EC2_USER}@{instance.public_ip_address}",
+                    "-t",  # Allocate a pseudo-terminal
+                    "-tt",  # Force pseudo-terminal allocation
+                    "bash --login -c 'exit'"  # Force a full login shell and exit immediately
+                ]
+            else:
+                # Standard interactive SSH session
+                ssh_command = [
+                    "ssh",
+                    "-o", "StrictHostKeyChecking=no",
+                    "-o", "UserKnownHostsFile=/dev/null",
+                    "-i", config.AWS_EC2_KEY_PATH,
+                    f"{config.AWS_EC2_USER}@{instance.public_ip_address}"
+                ]
 
-            # Start an interactive shell session
+            # Execute the SSH command
             try:
                 subprocess.run(ssh_command, check=True)
             except subprocess.CalledProcessError as e:
