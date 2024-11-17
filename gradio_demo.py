@@ -1,12 +1,7 @@
 from typing import Optional
-
 import gradio as gr
 import numpy as np
-import torch
-from PIL import Image
 import io
-
-
 import base64, os
 from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
