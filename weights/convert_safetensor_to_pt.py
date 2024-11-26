@@ -16,7 +16,7 @@ if args.version == 'v1':
     torch.save({'model':model}, 'weights/icon_detect/best.pt')
 elif args.version == 'v1_5':
     print("Converting v1_5")
-    tensor_dict = torch.load("weights/icon_detect_v1_5/model.safetensors")
+    tensor_dict = load_file("weights/icon_detect_v1_5/model.safetensors")
     model = DetectionModel('weights/icon_detect_v1_5/model.yaml')
     model.load_state_dict(tensor_dict)
     save_dict = {'model':model}

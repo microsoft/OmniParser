@@ -4,3 +4,4 @@ weights/icon_detect/
 weights/icon_detect_v1_5/
 .gradio
 __pycache__/
+debug.ipynb
