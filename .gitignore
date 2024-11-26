@@ -1,5 +1,6 @@
 weights/icon_caption_blip2
 weights/icon_caption_florence
 weights/icon_detect/
+weights/icon_detect_v1_5/
 .gradio
 __pycache__/
