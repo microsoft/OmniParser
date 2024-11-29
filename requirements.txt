@@ -14,5 +14,4 @@ dill
 accelerate
 timm
 einops==0.8.0
-paddlepaddle
-paddleocr
+
