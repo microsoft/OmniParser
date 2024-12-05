@@ -255,7 +255,7 @@ def remove_overlap_new(boxes, iou_threshold, ocr_bbox=None):
         # return box1[0] >= box2[0] and box1[1] >= box2[1] and box1[2] <= box2[2] and box1[3] <= box2[3]
         intersection = intersection_area(box1, box2)
         ratio1 = intersection / box_area(box1)
-        return ratio1 > 0.95
+        return ratio1 > 0.80
 
     # boxes = boxes.tolist()
     filtered_boxes = []
@@ -274,27 +274,28 @@ def remove_overlap_new(boxes, iou_threshold, ocr_bbox=None):
         if is_valid_box:
             # add the following 2 lines to include ocr bbox
             if ocr_bbox:
-                # only add the box if it does not overlap with any ocr bbox
+                # keep yolo boxes + prioritize ocr label
                 box_added = False
                 for box3_elem in ocr_bbox:
                     if not box_added:
                         box3 = box3_elem['bbox']
                         if is_inside(box3, box1): # ocr inside icon
-                            box_added = True
+                            # box_added = True
                             # delete the box3_elem from ocr_bbox
                             try:
                                 filtered_boxes.append({'type': 'text', 'bbox': box1_elem['bbox'], 'interactivity': True, 'content': box3_elem['content']})
                                 filtered_boxes.remove(box3_elem)
+                                # print('remove ocr bbox:', box3_elem)
                             except:
                                 continue
-                            break
+                            # break
                         elif is_inside(box1, box3): # icon inside ocr
                             box_added = True
-                            try:
-                                filtered_boxes.append({'type': 'icon', 'bbox': box1_elem['bbox'], 'interactivity': True, 'content': None})
-                                filtered_boxes.remove(box3_elem)
-                            except:
-                                continue
+                            # try:
+                            #     filtered_boxes.append({'type': 'icon', 'bbox': box1_elem['bbox'], 'interactivity': True, 'content': None})
+                            #     filtered_boxes.remove(box3_elem)
+                            # except:
+                            #     continue
                             break
                         else:
                             continue
