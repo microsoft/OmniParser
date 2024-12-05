@@ -2,6 +2,7 @@ weights/icon_caption_blip2
 weights/icon_caption_florence
 weights/icon_detect/
 weights/icon_detect_v1_5/
+weights/icon_detect_v1_5_2/
 .gradio
 __pycache__/
 debug.ipynb
