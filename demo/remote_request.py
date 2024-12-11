@@ -73,5 +73,6 @@ async def send_text(item: Item):
     import time
     start = time.time()
     dino_labled_img, parsed_content_list = Omniparser.parse(item.base64_image)
-    print('time:', time.time() - start)
-    return {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list}
+    latency = time.time() - start
+    print('time:', latency)
+    return {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, 'latency': latency}
