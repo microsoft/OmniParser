@@ -75,7 +75,7 @@ def get_yolo_model(model_path):
 
 
 @torch.inference_mode()
-def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_model_processor, prompt=None, batch_size=32):
+def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_model_processor, prompt=None, batch_size=None):
     # Number of samples per batch, --> 256 roughly takes 23 GB of GPU memory for florence model
 
     to_pil = ToPILImage()
@@ -99,6 +99,7 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
     
     generated_texts = []
     device = model.device
+    # batch_size = 64
     for i in range(0, len(croped_pil_image), batch_size):
         start = time.time()
         batch = croped_pil_image[i:i+batch_size]
@@ -398,7 +399,7 @@ def predict_yolo(model, image_path, box_threshold, imgsz, scale_img, iou_thresho
     return boxes, conf, phrases
 
 
-def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None, scale_img=False, imgsz=None, batch_size=None):
+def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None, scale_img=False, imgsz=None, batch_size=64):
     """ ocr_bbox: list of xyxy format bbox
     """
     image_source = Image.open(img_path).convert("RGB")
@@ -432,6 +433,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     # get the index of the first 'content': None
     starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
+    print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
     
     # get parsed icon local semantics
@@ -501,7 +503,7 @@ def check_ocr_box(image_path, display_img = True, output_bb_format='xywh', goal_
         else:
             text_threshold = easyocr_args['text_threshold']
         result = paddle_ocr.ocr(image_path, cls=False)[0]
-        conf = [item[1] for item in result]
+        # conf = [item[1] for item in result]
         coord = [item[0] for item in result if item[1][1] > text_threshold]
         text = [item[1][0] for item in result if item[1][1] > text_threshold]
     else:  # EasyOCR
