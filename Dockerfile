@@ -19,9 +19,7 @@
 # - Entrypoint script execution with Gradio server configuration for
 #   external access.
 
-# If it is gpu enviroment, use nvidia/cuda:12.3.1-devel-ubuntu22.04, otherwise use ubuntu:22.04
-# FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
-FROM docker.io/ubuntu:22.04
+FROM nvidia/cuda:12.3.1-devel-ubuntu22.04
 
 # Install system dependencies with explicit OpenGL libraries
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -68,8 +66,8 @@ RUN git lfs install && \
 
 # Install dependencies from requirements.txt with specific opencv-python-headless version
 RUN . /opt/conda/etc/profile.d/conda.sh && conda activate omni && \
-    # pip uninstall -y opencv-python opencv-python-headless && \
-    # pip install --no-cache-dir opencv-python-headless==4.8.1.78 && \
+    pip uninstall -y opencv-python opencv-python-headless && \
+    pip install --no-cache-dir opencv-python-headless==4.8.1.78 && \
     pip install -r requirements.txt && \
     pip install huggingface_hub
 
@@ -200,4 +198,4 @@ ENV WIDTH=$WIDTH
 # Set the entrypoint
 # ENTRYPOINT ["/usr/src/app/entrypoint.sh"]
 
-#  sudo docker build . -t omniparser-x-demo:local  # manually build the docker image (optional)
+#  docker build . -t omniparser-x-demo:local  # manually build the docker image (optional)

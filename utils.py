@@ -84,11 +84,15 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
     else:
         non_ocr_boxes = filtered_boxes
     croped_pil_image = []
+    t0 = time.time()
     for i, coord in enumerate(non_ocr_boxes):
         xmin, xmax = int(coord[0]*image_source.shape[1]), int(coord[2]*image_source.shape[1])
         ymin, ymax = int(coord[1]*image_source.shape[0]), int(coord[3]*image_source.shape[0])
         cropped_image = image_source[ymin:ymax, xmin:xmax, :]
+        # resize the image to 224x224 to avoid long overhead in clipimageprocessor # TODO
+        cropped_image = cv2.resize(cropped_image, (224, 224))
         croped_pil_image.append(to_pil(cropped_image))
+    print('time to prepare bbox:', time.time()-t0)
 
     model, processor = caption_model_processor['model'], caption_model_processor['processor']
     if not prompt:
@@ -103,14 +107,19 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
     for i in range(0, len(croped_pil_image), batch_size):
         start = time.time()
         batch = croped_pil_image[i:i+batch_size]
+        t1 = time.time()
         if model.device.type == 'cuda':
-            inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device, dtype=torch.float16)
+            inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt", do_resize=False).to(device=device, dtype=torch.float16)
         else:
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device)
+        t2 = time.time()
+        print('time to process image + tokenize text inputs:', t2-t1)
         if 'florence' in model.config.name_or_path:
-            generated_ids = model.generate(input_ids=inputs["input_ids"],pixel_values=inputs["pixel_values"],max_new_tokens=100,num_beams=3, do_sample=False)
+            generated_ids = model.generate(input_ids=inputs["input_ids"],pixel_values=inputs["pixel_values"],max_new_tokens=20,num_beams=1, do_sample=False)
         else:
             generated_ids = model.generate(**inputs, max_length=100, num_beams=5, no_repeat_ngram_size=2, early_stopping=True, num_return_sequences=1) # temperature=0.01, do_sample=True,
+        t3 = time.time()
+        print('time to generate:', t3-t2)
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
         generated_text = [gen.strip() for gen in generated_text]
         generated_texts.extend(generated_text)
@@ -437,6 +446,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
 
     
     # get parsed icon local semantics
+    time1 = time.time()
     if use_local_semantics:
         caption_model = caption_model_processor['model']
         if 'phi3_v' in caption_model.config.model_type: 
@@ -456,6 +466,7 @@ def get_som_labeled_img(img_path, model=None, BOX_TRESHOLD = 0.01, output_coord_
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
+    print('time to get parsed content:', time.time()-time1)
 
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
