@@ -30,12 +30,12 @@ Then download the model ckpts files in: https://huggingface.co/microsoft/OmniPar
 
 For v1: 
 convert the safetensor to .pt file. 
-```python
+```bash
 python weights/convert_safetensor_to_pt.py
+```
 
 For v1.5: 
 download 'model_v1_5.pt' from https://huggingface.co/microsoft/OmniParser/tree/main/icon_detect_v1_5, make a new dir: weights/icon_detect_v1_5, and put it inside the folder. No weight conversion is needed. 
-```
 
 ## Examples:
 We put together a few simple examples in the demo.ipynb. 
