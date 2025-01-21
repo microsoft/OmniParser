@@ -1,4 +1,3 @@
-import pyautogui
 import base64
 import time
 from enum import StrEnum
@@ -144,7 +143,7 @@ class ComputerTool(BaseAnthropicTool):
                 self.send_to_vm(f"pyautogui.moveTo({x}, {y})")
                 return ToolResult(output=f"Moved mouse to ({x}, {y})")
             elif action == "left_click_drag":
-                current_x, current_y = pyautogui.position()
+                current_x, current_y = self.send_to_vm("pyautogui.position()")
                 self.send_to_vm(f"pyautogui.dragTo({x}, {y}, duration=0.5)")
                 return ToolResult(output=f"Dragged mouse from ({current_x}, {current_y}) to ({x}, {y})")
 
