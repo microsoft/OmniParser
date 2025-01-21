@@ -4,11 +4,12 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+from utils import get_som_labeled_img, get_caption_model_processor, get_yolo_model, get_ocr_bbox
 import torch
 from PIL import Image
 from typing import Dict, Tuple, List
 import base64
+import io
 
 
 config = {
@@ -30,12 +31,9 @@ class Omniparser(object):
         print('Omniparser initialized!!!')
 
     def parse(self, image_base64: str):
-        image_path = '../imgs/demo_image.jpg'
-        with open(image_path, "wb") as fh:
-            fh.write(base64.b64decode(image_base64))
-        print('Parsing image:', image_path)
-
-        image = Image.open(image_path)
+        # Convert base64 to image directly without saving to disk
+        image_bytes = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_bytes))
         print('image size:', image.size)
         
         box_overlay_ratio = max(image.size) / 3200
@@ -47,11 +45,8 @@ class Omniparser(object):
         }
         BOX_TRESHOLD = config['BOX_TRESHOLD']
 
-        ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.8}, use_paddleocr=True)
-        text, ocr_bbox = ocr_bbox_rslt
-        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, self.som_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=self.caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.7, scale_img=False, batch_size=128)
-        with open('../imgs/demo_image_som.jpg', "wb") as fh:
-            fh.write(base64.b64decode(dino_labled_img))
+        text, ocr_bbox = get_ocr_bbox(image)
+        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image, self.som_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=self.caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.7, scale_img=False, batch_size=128)
 
         return dino_labled_img, parsed_content_list
     
