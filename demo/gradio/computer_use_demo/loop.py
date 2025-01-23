@@ -46,15 +46,13 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    selected_screen: int = 0,
     omniparser_url: str
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url else None,
-                            selected_screen=selected_screen,)
+    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url else None)
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(
@@ -63,15 +61,13 @@ def sampling_loop_sync(
             api_key=api_key, 
             api_response_callback=api_response_callback,
             max_tokens=max_tokens,
-            only_n_most_recent_images=only_n_most_recent_images,
-            selected_screen=selected_screen
+            only_n_most_recent_images=only_n_most_recent_images
         )
 
         # from IPython.core.debugger import Pdb; Pdb().set_trace()
         executor = AnthropicExecutor(
             output_callback=output_callback,
-            tool_output_callback=tool_output_callback,
-            selected_screen=selected_screen
+            tool_output_callback=tool_output_callback
         )
     
     elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
@@ -80,14 +76,12 @@ def sampling_loop_sync(
             provider=provider,
             api_key=api_key,
             api_response_callback=api_response_callback,
-            selected_screen=selected_screen,
             output_callback=output_callback,
         )
 
         executor = AnthropicExecutor(
             output_callback=output_callback,
             tool_output_callback=tool_output_callback,
-            selected_screen=selected_screen
         )
         
     else:

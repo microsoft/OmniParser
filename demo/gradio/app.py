@@ -209,7 +209,6 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        selected_screen=0,
         omniparser_url=state["omniparser_url"]
     ):  
         if loop_msg is None:

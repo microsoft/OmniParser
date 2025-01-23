@@ -86,14 +86,13 @@ class ComputerTool(BaseAnthropicTool):
     def to_params(self) -> BetaToolComputerUse20241022Param:
         return {"name": self.name, "type": self.api_type, **self.options}
 
-    def __init__(self, selected_screen: int = 0, is_scaling: bool = False):
+    def __init__(self, is_scaling: bool = False):
         super().__init__()
 
         # Get screen width and height using Windows command
         self.display_num = None
         self.offset_x = 0
         self.offset_y = 0
-        self.selected_screen = selected_screen   
         self.is_scaling = is_scaling
         self.width, self.height = self.get_screen_size()
         print(f"screen size: {self.width}, {self.height}")
@@ -253,7 +252,7 @@ class ComputerTool(BaseAnthropicTool):
             screenshot = self.padding_image(screenshot)
             self.target_dimension = MAX_SCALING_TARGETS["WXGA"]
         width, height = self.target_dimension["width"], self.target_dimension["height"]
-        screenshot, path = get_screenshot(selected_screen=0, resize=True, target_width=width, target_height=height)
+        screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height)
 
         # return ToolResult()
         return ToolResult(base64_image=base64.b64encode(path.read_bytes()).decode())

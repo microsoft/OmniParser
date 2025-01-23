@@ -53,7 +53,6 @@ class AnthropicActor:
         api_response_callback: Callable[[APIResponse[BetaMessage]], None],
         max_tokens: int = 4096,
         only_n_most_recent_images: int | None = None,
-        selected_screen: int = 0,
         print_usage: bool = True,
     ):
         self.model = model
@@ -62,11 +61,8 @@ class AnthropicActor:
         self.api_response_callback = api_response_callback
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
-        self.selected_screen = selected_screen
         
-        self.tool_collection = ToolCollection(
-            ComputerTool(selected_screen=selected_screen),
-        )
+        self.tool_collection = ToolCollection(ComputerTool())
 
         self.system = SYSTEM_PROMPT
         
@@ -175,7 +171,7 @@ if __name__ == "__main__":
     #     model="claude-3-5-sonnet-20241022",
     #     system=SYSTEM_PROMPT,
     #     # tools=ToolCollection(
-    #     #     ComputerTool(selected_screen=0),
+    #     #     ComputerTool(),
     #     # ).to_params(),
     #     betas=["computer-use-2024-10-22"],
     #     messages=[

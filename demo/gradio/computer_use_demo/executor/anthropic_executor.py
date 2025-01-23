@@ -20,10 +20,9 @@ class AnthropicExecutor:
         self, 
         output_callback: Callable[[BetaContentBlockParam], None], 
         tool_output_callback: Callable[[Any, str], None],
-        selected_screen: int = 0
     ):
         self.tool_collection = ToolCollection(
-            ComputerTool(selected_screen=selected_screen)
+            ComputerTool()
         )
         self.output_callback = output_callback
         self.tool_output_callback = tool_output_callback

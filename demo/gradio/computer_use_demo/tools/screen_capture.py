@@ -7,7 +7,7 @@ from io import BytesIO
 
 OUTPUT_DIR = "./tmp/outputs"
 
-def get_screenshot(selected_screen: int = 0, resize: bool = False, target_width: int = 1920, target_height: int = 1080):
+def get_screenshot(resize: bool = False, target_width: int = 1920, target_height: int = 1080):
     """Capture screenshot by requesting from HTTP endpoint - returns native resolution unless resized"""
     output_dir = Path(OUTPUT_DIR)
     output_dir.mkdir(parents=True, exist_ok=True)

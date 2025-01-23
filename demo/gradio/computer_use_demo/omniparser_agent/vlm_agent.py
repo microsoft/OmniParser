@@ -35,10 +35,8 @@ def extract_data(input_string, data_type):
 
 class OmniParser:
     def __init__(self, 
-                 url: str,
-                 selected_screen: int = 0) -> None:
+                 url: str) -> None:
         self.url = url
-        self.selected_screen = selected_screen
         if not self.url:
             config = {
                         'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
@@ -51,7 +49,7 @@ class OmniParser:
             self.omniparser = Omniparser_class(config=config)
 
     def __call__(self,):
-        screenshot, screenshot_path = get_screenshot(selected_screen=self.selected_screen)
+        screenshot, screenshot_path = get_screenshot()
         screenshot_path = str(screenshot_path)
         image_base64 = encode_image(screenshot_path)
         if self.url:
@@ -106,7 +104,6 @@ class VLMAgent:
         api_response_callback: Callable,
         max_tokens: int = 4096,
         only_n_most_recent_images: int | None = None,
-        selected_screen: int = 0,
         print_usage: bool = True,
     ):
         if model == "omniparser + gpt-4o":
@@ -119,7 +116,6 @@ class VLMAgent:
         self.api_response_callback = api_response_callback
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
-        self.selected_screen = selected_screen
         self.output_callback = output_callback
 
         self.print_usage = print_usage
