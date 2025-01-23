@@ -113,7 +113,9 @@ def sampling_loop_sync(
         )
     
     elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
-        omniparser = OmniParser(url="http://localhost:8000/send_text/",
+        # omniparser = OmniParser(url="http://localhost:8000/send_text/",
+        #                         selected_screen=selected_screen,)
+        omniparser = OmniParser(url=None,
                                 selected_screen=selected_screen,)
 
         actor = VLMAgent(

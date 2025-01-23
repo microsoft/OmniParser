@@ -21,7 +21,8 @@ from computer_use_demo.gui_agent.llm_utils.oai import run_oai_interleaved, encod
 from computer_use_demo.gui_agent.llm_utils.qwen import run_qwen
 from computer_use_demo.gui_agent.llm_utils.llm_utils import extract_data
 from computer_use_demo.colorful_text import colorful_text_vlm
-
+import time
+#     start = time.time()
 
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilizing a Windows system with internet access.
@@ -36,14 +37,34 @@ class OmniParser:
                  selected_screen: int = 0) -> None:
         self.url = url
         self.selected_screen = selected_screen
+        if not self.url:
+            config = {
+                        'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
+                        'device': 'cpu',
+                        'caption_model_name': 'florence2',
+                        'caption_model_path': '../weights/icon_caption_florence',
+                        'BOX_TRESHOLD': 0.05
+                    }
+            from computer_use_demo.omniparser_agent.omniparser import Omniparser as Omniparser_class
+            self.omniparser = Omniparser_class(config=config)
 
     def __call__(self,):
         screenshot, screenshot_path = get_screenshot(selected_screen=self.selected_screen)
         screenshot_path = str(screenshot_path)
         image_base64 = encode_image(screenshot_path)
+        if self.url:
+            response = requests.post(self.url, json={"base64_image": image_base64, 'prompt': 'omniparser process'})
+            response_json = response.json()
+        else:
+            start = time.time()
+            dino_labled_img, parsed_content_list = self.omniparser.parse(image_base64)
+            latency = time.time() - start
+            response_json = {
+                'som_image_base64': dino_labled_img,
+                'parsed_content_list': parsed_content_list,
+                'latency': latency
+            }
 
-        response = requests.post(self.url, json={"base64_image": image_base64, 'prompt': 'omniparser process'})
-        response_json = response.json()
         som_image_data = base64.b64decode(response_json['som_image_base64'])
         screenshot_path_uuid = Path(screenshot_path).stem.replace("screenshot_", "")
         som_screenshot_path = f"{OUTPUT_DIR}/screenshot_som_{screenshot_path_uuid}.png"
@@ -64,9 +85,11 @@ class OmniParser:
         for idx, element in enumerate(response_json["parsed_content_list"]):
             element['idx'] = idx
             if element['type'] == 'text':
-                screen_info += f'''<p id={idx} class="text" alt="{element['content']}"> </p>\n'''
+                # screen_info += f'''<p id={idx} class="text" alt="{element['content']}"> </p>\n'''
+                screen_info += f'ID: {idx}, Text: {element["content"]}\n'
             elif element['type'] == 'icon':
-                screen_info += f'''<img id={idx} class="icon" alt="{element['content']}"> </img>\n'''
+                # screen_info += f'''<img id={idx} class="icon" alt="{element['content']}"> </img>\n'''
+                screen_info += f'ID: {idx}, Icon: {element["content"]}\n'
         response_json['screen_info'] = screen_info
         return response_json
 
@@ -106,12 +129,16 @@ class VLMAgent:
 
         self.system = system_prompt_suffix
            
-    def __call__(self, messages: list, parsed_screen: list[str, list]):
+    def __call__(self, messages: list, parsed_screen: list[str, list, dict]):
         # Show results of Omniparser
         image_base64 = parsed_screen['original_screenshot_base64']
+        latency_omniparser = parsed_screen['latency']
         self.output_callback(f'Screenshot for {colorful_text_vlm}:\n<img src="data:image/png;base64,{image_base64}">',
                              sender="bot")
         self.output_callback(f'Set of Marks Screenshot for {colorful_text_vlm}:\n<img src="data:image/png;base64,{parsed_screen["som_image_base64"]}">', sender="bot")
+        screen_info = str(parsed_screen['screen_info'])
+        self.output_callback(f'Screen Info for {colorful_text_vlm}:\n{screen_info}', sender="bot")
+
         screenshot_uuid = parsed_screen['screenshot_uuid']
         screen_width, screen_height = parsed_screen['width'], parsed_screen['height']
 
@@ -125,7 +152,7 @@ class VLMAgent:
         planner_messages = _keep_latest_images(planner_messages)
         # if self.only_n_most_recent_images:
         #     _maybe_filter_to_n_most_recent_images(planner_messages, self.only_n_most_recent_images)
-        print(f"filtered_messages: {planner_messages}\n\n", "full messages:", messages)
+        # print(f"filtered_messages: {planner_messages}\n\n", "full messages:", messages)
 
         if isinstance(planner_messages[-1], dict):
             if not isinstance(planner_messages[-1]["content"], list):
@@ -134,7 +161,7 @@ class VLMAgent:
             planner_messages[-1]["content"].append(f"{OUTPUT_DIR}/screenshot_som_{screenshot_uuid}.png")
 
         print(f"Sending messages to VLMPlanner : {planner_messages}")
-
+        start = time.time()
         if "gpt" in self.model:
             vlm_response, token_usage = run_oai_interleaved(
                 messages=planner_messages,
@@ -164,6 +191,8 @@ class VLMAgent:
             pass # TODO
         else:
             raise ValueError(f"Model {self.model} not supported")
+        latency_vlm = time.time() - start
+        self.output_callback(f"VLMPlanner latency: {latency_vlm}, Omniparser latency: {latency_omniparser}", sender="bot")
 
         print(f"VLMPlanner response: {vlm_response}")
         
@@ -189,7 +218,7 @@ class VLMAgent:
                 vlm_plan_str += f'{value}'
             else:
                 vlm_plan_str += f'\n{key}: {value}'
-        self.output_callback(f"{colorful_text_vlm}:\n{vlm_plan_str}", sender="bot")
+        # self.output_callback(f"{colorful_text_vlm}:\n{vlm_plan_str}", sender="bot")
 
         # construct the response so that anthropicExcutor can execute the tool
         response_content = [BetaTextBlock(text=vlm_plan_str, type='text')]
@@ -231,10 +260,12 @@ Here is the list of all detected bounding boxes by IDs on the screen and their d
 Your available "Next Action" only include:
 - type: type a string of text.
 - left_click: Describe the ui element to be clicked.
-- enter: Press an enter key.
+- double_click: Describe the ui element to be double clicked.
+- right_click: Describe the ui element to be right clicked.
 - escape: Press an ESCAPE key.
 - hover: Describe the ui element to be hovered.
-- scroll: Scroll the screen, you must specify up or down.
+- scroll_up: Scroll the screen up.
+- scroll_down: Scroll the screen down.
 - press: Describe the ui element to be pressed.
 
 Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on, and the value (if the action is 'type') in order to complete the task.

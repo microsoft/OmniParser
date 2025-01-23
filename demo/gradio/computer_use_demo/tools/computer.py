@@ -208,6 +208,12 @@ class ComputerTool(BaseAnthropicTool):
                     time.sleep(1)
                     self.send_to_vm("pyautogui.mouseUp()")
                 return ToolResult(output=f"Performed {action}")
+        if action in ("scroll_up", "scroll_down"):
+            if action == "scroll_up":
+                self.send_to_vm("pyautogui.scroll(100)")
+            elif action == "scroll_down":
+                self.send_to_vm("pyautogui.scroll(-100)")
+            return ToolResult(output=f"Performed {action}")
             
         raise ToolError(f"Invalid action: {action}")
 
