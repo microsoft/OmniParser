@@ -22,7 +22,6 @@ from anthropic.types import TextBlock
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock
 from anthropic.types.tool_use_block import ToolUseBlock
 from computer_use_demo.loop import (
-    PROVIDER_TO_DEFAULT_MODEL_NAME,
     APIProvider,
     sampling_loop_sync,
 )
@@ -54,9 +53,7 @@ def setup_state(state):
     if "openai_api_key" not in state:  # Fetch API keys from environment variables
         state["openai_api_key"] = os.getenv("OPENAI_API_KEY", "")
     if "anthropic_api_key" not in state:
-        state["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY", "")    
-    if "qwen_api_key" not in state:
-        state["qwen_api_key"] = os.getenv("QWEN_API_KEY", "")
+        state["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY", "")
     if "api_key" not in state:
         state["api_key"] = ""
     if "auth_validated" not in state:
