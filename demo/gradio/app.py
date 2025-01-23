@@ -66,6 +66,8 @@ def setup_state(state):
         state["only_n_most_recent_images"] = 2
     if 'chatbot_messages' not in state:
         state['chatbot_messages'] = []
+    if "omniparser_url" not in state:
+        state["omniparser_url"] = "localhost:8000"
 
 async def main(state):
     """Render loop for Gradio"""
@@ -207,7 +209,8 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        selected_screen=0
+        selected_screen=0,
+        omniparser_url=state["omniparser_url"]
     ):  
         if loop_msg is None:
             yield state['chatbot_messages']
@@ -271,6 +274,13 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
                     placeholder="Paste your API key here",
                     interactive=True,
                 )
+        with gr.Row():
+            omniparser_url = gr.Textbox(
+                label="OmniParser Base URL",
+                value="localhost:8000",
+                placeholder="Enter OmniParser base URL (e.g. localhost:8000)",
+                interactive=True
+            )
         # hide_images = gr.Checkbox(label="Hide screenshots", value=False)
 
     with gr.Row():
@@ -341,10 +351,14 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         state["api_key"] = api_key_value
         state[f'{state["provider"]}_api_key'] = api_key_value
 
+    def update_omniparser_url(url_value, state):
+        state["omniparser_url"] = url_value
+
     model.change(fn=update_model, inputs=[model, state], outputs=[provider, api_key])
     only_n_images.change(fn=update_only_n_images, inputs=[only_n_images, state], outputs=None)
     provider.change(fn=update_provider, inputs=[provider, state], outputs=api_key)
     api_key.change(fn=update_api_key, inputs=[api_key, state], outputs=None)
+    omniparser_url.change(fn=update_omniparser_url, inputs=[omniparser_url, state], outputs=None)
 
     submit_button.click(process_input, [chat_input, state], chatbot)
 

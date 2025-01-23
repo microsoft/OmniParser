@@ -46,16 +46,16 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    selected_screen: int = 0
+    selected_screen: int = 0,
+    omniparser_url: str
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
+    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url else None,
+                            selected_screen=selected_screen,)
     if model == "claude-3-5-sonnet-20241022":
-        omniparser = OmniParser(url="http://localhost:8000/send_text/",
-                                selected_screen=selected_screen,)
-        
         # Register Actor and Executor
         actor = AnthropicActor(
             model=model, 
@@ -75,11 +75,6 @@ def sampling_loop_sync(
         )
     
     elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
-        # omniparser = OmniParser(url="http://localhost:8000/send_text/",
-        #                         selected_screen=selected_screen,)
-        omniparser = OmniParser(url=None,
-                                selected_screen=selected_screen,)
-
         actor = VLMAgent(
             model=model,
             provider=provider,
