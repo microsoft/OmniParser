@@ -31,31 +31,18 @@ from io import BytesIO
 import gradio as gr
 from typing import Dict
 
-
 BETA_FLAG = "computer-use-2024-10-22"
-
 
 class APIProvider(StrEnum):
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
     VERTEX = "vertex"
 
-
-PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
-    APIProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
-    APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
-    APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
-}
-
-
-# Check OS
-
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilizing a Windows system with internet access.
 * The current date is {datetime.today().strftime('%A, %B %d, %Y')}.
 </SYSTEM_CAPABILITY>
 """
-
 
 class AnthropicActor:
     def __init__(

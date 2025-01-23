@@ -18,12 +18,20 @@ from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, B
 
 from computer_use_demo.tools.screen_capture import get_screenshot
 from computer_use_demo.gui_agent.llm_utils.oai import run_oai_interleaved, encode_image
-from computer_use_demo.gui_agent.llm_utils.qwen import run_qwen
-from computer_use_demo.gui_agent.llm_utils.llm_utils import extract_data
 from computer_use_demo.colorful_text import colorful_text_vlm
 import time
+import re
 
 OUTPUT_DIR = "./tmp/outputs"
+
+def extract_data(input_string, data_type):
+    # Regular expression to extract content starting from '```python' until the end if there are no closing backticks
+    pattern = f"```{data_type}" + r"(.*?)(```|$)"
+    # Extract content
+    # re.DOTALL allows '.' to match newlines as well
+    matches = re.findall(pattern, input_string, re.DOTALL)
+    # Return the first match if exists, trimming whitespace and ignoring potential closing backticks
+    return matches[0][0].strip() if matches else input_string
 
 class OmniParser:
     def __init__(self, 
@@ -165,19 +173,6 @@ class VLMAgent:
             print(f"oai token usage: {token_usage}")
             self.total_token_usage += token_usage
             self.total_cost += (token_usage * 0.15 / 1000000)  # https://openai.com/api/pricing/
-            
-        elif "qwen" in self.model:
-            vlm_response, token_usage = run_qwen(
-                messages=planner_messages,
-                system=system,
-                llm=self.model,
-                api_key=self.api_key,
-                max_tokens=self.max_tokens,
-                temperature=0,
-            )
-            print(f"qwen token usage: {token_usage}")
-            self.total_token_usage += token_usage
-            self.total_cost += (token_usage * 0.02 / 7.25 / 1000)  # 1USD=7.25CNY, https://help.aliyun.com/zh/dashscope/developer-reference/tongyi-qianwen-vl-plus-api
         elif "phi" in self.model:
             pass # TODO
         else:

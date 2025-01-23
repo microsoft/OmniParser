@@ -1,75 +1,39 @@
 """
 Agentic sampling loop that calls the Anthropic API and local implenmentation of anthropic-defined computer use tools.
 """
-import time
-import json
-import asyncio
-import platform
 from collections.abc import Callable
-from datetime import datetime
 from enum import StrEnum
-from typing import Any, cast, Dict
 
-from anthropic import Anthropic, AnthropicBedrock, AnthropicVertex, APIResponse
+from anthropic import APIResponse
 from anthropic.types import (
-    ToolResultBlockParam,
     TextBlock,
 )
 from anthropic.types.beta import (
     BetaContentBlock,
-    BetaContentBlockParam,
-    BetaImageBlockParam,
     BetaMessage,
-    BetaMessageParam,
-    BetaTextBlockParam,
-    BetaToolResultBlockParam,
+    BetaMessageParam
 )
 from computer_use_demo.tools import ToolResult
-
-import torch
 
 from computer_use_demo.gui_agent.anthropic_agent import AnthropicActor
 from computer_use_demo.executor.anthropic_executor import AnthropicExecutor
 from computer_use_demo.omniparser_agent.vlm_agent import OmniParser, VLMAgent
-from computer_use_demo.colorful_text import colorful_text_vlm
-from computer_use_demo.tools.screen_capture import get_screenshot
-from computer_use_demo.gui_agent.llm_utils.oai import encode_image
-
 
 BETA_FLAG = "computer-use-2024-10-22"
-
 
 class APIProvider(StrEnum):
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
     VERTEX = "vertex"
     OPENAI = "openai"
-    QWEN = "qwen"
 
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
     APIProvider.ANTHROPIC: "claude-3-5-sonnet-20241022",
     APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
-    # APIProvider.OPENAI: "gpt-4o",
-    # APIProvider.QWEN: "qwen2vl",
+    APIProvider.OPENAI: "gpt-4o",
 }
-
-
-# This system prompt is optimized for the Docker environment in this repository and
-# specific tool combinations enabled.
-# We encourage modifying this system prompt to ensure the model has context for the
-# environment it is running in, and to provide any additional information that may be
-# helpful for the task at hand.
-SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-* You are utilizing a Windows system with internet access.
-* The current date is {datetime.today().strftime('%A, %B %d, %Y')}.
-</SYSTEM_CAPABILITY>
-"""
-
-import base64
-from PIL import Image
-from io import BytesIO
 
 def sampling_loop_sync(
     *,
