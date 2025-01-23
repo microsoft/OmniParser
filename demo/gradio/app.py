@@ -67,8 +67,6 @@ def setup_state(state):
         state["tools"] = {}
     if "only_n_most_recent_images" not in state:
         state["only_n_most_recent_images"] = 2
-    if "custom_system_prompt" not in state:
-        state["custom_system_prompt"] = ""
     if 'chatbot_messages' not in state:
         state['chatbot_messages'] = []
 
@@ -204,7 +202,6 @@ def process_input(user_input, state):
 
     # Run sampling_loop_sync with the chatbot_output_callback
     for loop_msg in sampling_loop_sync(
-        system_prompt_suffix=state["custom_system_prompt"],
         model=state["model"],
         provider=state["provider"],
         messages=state["messages"],
@@ -250,12 +247,6 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
                     label="Model",
                     choices=["omniparser + gpt-4o", "omniparser + phi35v", "claude-3-5-sonnet-20241022"],
                     value="omniparser + gpt-4o",  # Set to one of the choices
-                    interactive=True,
-                )
-            with gr.Column():
-                custom_prompt = gr.Textbox(
-                    label="System Prompt Suffix",
-                    value="",
                     interactive=True,
                 )
             with gr.Column():
@@ -333,9 +324,6 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         )
 
         return provider_update, api_key_update
- 
-    def update_system_prompt_suffix(system_prompt_suffix, state):
-        state["custom_system_prompt"] = system_prompt_suffix
 
     def update_only_n_images(only_n_images_value, state):
         state["only_n_most_recent_images"] = only_n_images_value
@@ -357,7 +345,6 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         state[f'{state["provider"]}_api_key'] = api_key_value
 
     model.change(fn=update_model, inputs=[model, state], outputs=[provider, api_key])
-    custom_prompt.change(fn=update_system_prompt_suffix, inputs=[custom_prompt, state], outputs=None)
     only_n_images.change(fn=update_only_n_images, inputs=[only_n_images, state], outputs=None)
     provider.change(fn=update_provider, inputs=[provider, state], outputs=api_key)
     api_key.change(fn=update_api_key, inputs=[api_key, state], outputs=None)

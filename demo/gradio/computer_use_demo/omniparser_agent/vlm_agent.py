@@ -22,13 +22,7 @@ from computer_use_demo.gui_agent.llm_utils.qwen import run_qwen
 from computer_use_demo.gui_agent.llm_utils.llm_utils import extract_data
 from computer_use_demo.colorful_text import colorful_text_vlm
 import time
-#     start = time.time()
 
-SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-* You are utilizing a Windows system with internet access.
-* The current date is {datetime.today().strftime('%A, %B %d, %Y')}.
-</SYSTEM_CAPABILITY>
-"""
 OUTPUT_DIR = "./tmp/outputs"
 
 class OmniParser:
@@ -94,13 +88,11 @@ class OmniParser:
         return response_json
 
 
-
 class VLMAgent:
     def __init__(
         self,
         model: str, 
         provider: str, 
-        system_prompt_suffix: str, 
         api_key: str,
         output_callback: Callable, 
         api_response_callback: Callable,
@@ -115,7 +107,6 @@ class VLMAgent:
             raise ValueError(f"Model {model} not supported")
         
         self.provider = provider
-        self.system_prompt_suffix = system_prompt_suffix
         self.api_key = api_key
         self.api_response_callback = api_response_callback
         self.max_tokens = max_tokens
@@ -127,7 +118,7 @@ class VLMAgent:
         self.total_token_usage = 0
         self.total_cost = 0
 
-        self.system = system_prompt_suffix
+        self.system = ''
            
     def __call__(self, messages: list, parsed_screen: list[str, list, dict]):
         # Show results of Omniparser
@@ -144,7 +135,7 @@ class VLMAgent:
 
         # example parsed_screen: {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, "screen_info"}
         boxids_and_labels = parsed_screen["screen_info"]
-        system = self._get_system_prompt(boxids_and_labels) + self.system_prompt_suffix
+        system = self._get_system_prompt(boxids_and_labels)
 
         # drop looping actions msg, byte image etc
         planner_messages = messages

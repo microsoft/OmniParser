@@ -61,8 +61,7 @@ class AnthropicActor:
     def __init__(
         self, 
         model: str, 
-        provider: APIProvider, 
-        system_prompt_suffix: str, 
+        provider: APIProvider,
         api_key: str,
         api_response_callback: Callable[[APIResponse[BetaMessage]], None],
         max_tokens: int = 4096,
@@ -72,7 +71,6 @@ class AnthropicActor:
     ):
         self.model = model
         self.provider = provider
-        self.system_prompt_suffix = system_prompt_suffix
         self.api_key = api_key
         self.api_response_callback = api_response_callback
         self.max_tokens = max_tokens
@@ -83,9 +81,7 @@ class AnthropicActor:
             ComputerTool(selected_screen=selected_screen),
         )
 
-        self.system = (
-            f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}"
-        )
+        self.system = SYSTEM_PROMPT
         
         self.total_token_usage = 0
         self.total_cost = 0

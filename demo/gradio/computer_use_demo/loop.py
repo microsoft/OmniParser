@@ -75,7 +75,6 @@ def sampling_loop_sync(
     *,
     model: str,
     provider: APIProvider | None,
-    system_prompt_suffix: str,
     messages: list[BetaMessageParam],
     output_callback: Callable[[BetaContentBlock], None],
     tool_output_callback: Callable[[ToolResult, str], None],
@@ -96,8 +95,7 @@ def sampling_loop_sync(
         # Register Actor and Executor
         actor = AnthropicActor(
             model=model, 
-            provider=provider, 
-            system_prompt_suffix=system_prompt_suffix, 
+            provider=provider,
             api_key=api_key, 
             api_response_callback=api_response_callback,
             max_tokens=max_tokens,
@@ -121,7 +119,6 @@ def sampling_loop_sync(
         actor = VLMAgent(
             model=model,
             provider=provider,
-            system_prompt_suffix=system_prompt_suffix,
             api_key=api_key,
             api_response_callback=api_response_callback,
             selected_screen=selected_screen,
