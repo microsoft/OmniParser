@@ -34,7 +34,9 @@ API_KEY_FILE = CONFIG_DIR / "api_key"
 INTRO_TEXT = '''
 🚀🤖✨ It's Play Time!
 
-Welcome to the OmniParser+X Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let OmniParser turn your general purpose vision-langauge model to an AI agent. Type a message to play with your beloved assistant.
+Welcome to the OmniParser+X Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+
+Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
 '''
 
 class Sender(StrEnum):
@@ -284,7 +286,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
 
     with gr.Row():
         with gr.Column(scale=8):
-            chat_input = gr.Textbox(show_label=False, placeholder="Type a message to send to Computer Use OOTB...", container=False)
+            chat_input = gr.Textbox(show_label=False, placeholder="Type a message to send to Omniparser + X ...", container=False)
         with gr.Column(scale=1, min_width=50):
             submit_button = gr.Button(value="Send", variant="primary")
 
@@ -353,11 +355,20 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     def update_omniparser_url(url_value, state):
         state["omniparser_url"] = url_value
 
+    def clear_chat(state):
+        # Reset message-related state
+        state["messages"] = []
+        state["responses"] = {}
+        state["tools"] = {}
+        state['chatbot_messages'] = []
+        return state['chatbot_messages']
+
     model.change(fn=update_model, inputs=[model, state], outputs=[provider, api_key])
     only_n_images.change(fn=update_only_n_images, inputs=[only_n_images, state], outputs=None)
     provider.change(fn=update_provider, inputs=[provider, state], outputs=api_key)
     api_key.change(fn=update_api_key, inputs=[api_key, state], outputs=None)
     omniparser_url.change(fn=update_omniparser_url, inputs=[omniparser_url, state], outputs=None)
+    chatbot.clear(fn=clear_chat, inputs=[state], outputs=[chatbot])
 
     submit_button.click(process_input, [chat_input, state], chatbot)
 
