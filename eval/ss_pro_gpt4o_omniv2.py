@@ -10,7 +10,7 @@ import openai
 from openai import BadRequestError
 
 model_name = "gpt-4o-2024-05-13"
-OPENAI_KEY = os.environ.get("OPENAI_API_KEY")  # "nEvErGoNnAgIvEyOuUp"
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY")
 
 def convert_pil_image_to_base64(image):
     buffered = BytesIO()
