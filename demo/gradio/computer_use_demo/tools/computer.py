@@ -234,6 +234,7 @@ class ComputerTool(BaseAnthropicTool):
                 json={"command": command_list},
                 timeout=90
             )
+            time.sleep(0.7) # avoid async error as actions take time to complete
             print(f"action executed")
             if response.status_code != 200:
                 raise ToolError(f"Failed to execute command. Status code: {response.status_code}")
@@ -253,7 +254,7 @@ class ComputerTool(BaseAnthropicTool):
             self.target_dimension = MAX_SCALING_TARGETS["WXGA"]
         width, height = self.target_dimension["width"], self.target_dimension["height"]
         screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height)
-
+        time.sleep(0.7) # avoid async error as actions take time to complete
         # return ToolResult()
         return ToolResult(base64_image=base64.b64encode(path.read_bytes()).decode())
         
