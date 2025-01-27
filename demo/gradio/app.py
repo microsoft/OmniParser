@@ -294,10 +294,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         with gr.Column(scale=1):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
         with gr.Column(scale=3):
-            # Get the fully qualified domain name of the machine
-            machine_fqdn = socket.getfqdn()
             iframe = gr.HTML(
-                f'<iframe src="http://{machine_fqdn}:8006/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+                f'<iframe src="http://localhost:8006/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
                 container=False,
                 elem_classes="no-padding"
             )
@@ -371,45 +369,6 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     chatbot.clear(fn=clear_chat, inputs=[state], outputs=[chatbot])
 
     submit_button.click(process_input, [chat_input, state], chatbot)
-
-from fastapi import FastAPI
-import uvicorn
-from multiprocessing import Process
-
-app = FastAPI()
-
-# Mount the Gradio app under the "/gradio" path
-app = gr.mount_gradio_app(app, demo, path="/gradio")
-
-# Optional: Add a root endpoint that redirects to the Gradio interface
-@app.get("/")
-async def root():
-    return {"message": "Welcome to OmniParser Demo API", 
-            "gradio_interface": "/gradio"}
-
-# Create a second FastAPI app for VNC
-vnc_app = FastAPI()
-
-@vnc_app.get("/")
-async def vnc_root():
-    return {"message": "VNC Server"}
-
-def run_app(app, host, port):
-    uvicorn.run(app, host=host, port=port)
-
-# To run this with uvicorn:
+    
 if __name__ == "__main__":
-    # Start the main app on port 7889
-    p1 = Process(target=run_app, args=(app, "0.0.0.0", 7889))
-    # Start the VNC app on port 8006
-    p2 = Process(target=run_app, args=(vnc_app, "0.0.0.0", 8006))
-    
-    p1.start()
-    p2.start()
-    
-    try:
-        p1.join()
-        p2.join()
-    except KeyboardInterrupt:
-        p1.terminate()
-        p2.terminate()
+    demo.launch(server_name="0.0.0.0", server_port=7888)
