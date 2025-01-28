@@ -404,7 +404,7 @@ def int_box_area(box, w, h):
     int_box = [int(x1*w), int(y1*h), int(x2*w), int(y2*h)]
     area = (int_box[2] - int_box[0]) * (int_box[3] - int_box[1])
     return area
-    
+
 def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_TRESHOLD=0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None, scale_img=False, imgsz=None, batch_size=64):
     """Process either an image path or Image object
     
@@ -539,18 +539,5 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
         elif output_bb_format == 'xyxy':
             bb = [get_xyxy(item) for item in coord]
     return (text, bb), goal_filtering
-
-def get_ocr_bbox(image: Image.Image):
-    if image.mode == 'RGBA':
-        # Convert RGBA to RGB to avoid alpha channel issues
-        image = image.convert('RGB')
-    image_np = np.array(image)
-    result = paddle_ocr.ocr(image_np, cls=False)[0]
-    text_threshold = 0.8
-    coord = [item[0] for item in result if item[1][1] > text_threshold]
-    text = [item[1][0] for item in result if item[1][1] > text_threshold]
-    bb = [get_xyxy(item) for item in coord]
-    return text, bb
-
 
 
