@@ -3,14 +3,15 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import time
 from utils import get_som_labeled_img, get_caption_model_processor, get_yolo_model, check_ocr_box
 import torch
 from PIL import Image
 from typing import Dict, Tuple, List
 import base64
 import io
-
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 config = {
     'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
@@ -51,8 +52,7 @@ class Omniparser(object):
         return dino_labled_img, parsed_content_list
     
 
-from fastapi import FastAPI
-from pydantic import BaseModel
+
 
 app = FastAPI()
 
@@ -65,9 +65,13 @@ Omniparser = Omniparser(config)
 @app.post("/send_text/")
 async def send_text(item: Item):
     print('start parsing...')
-    import time
+    
     start = time.time()
     dino_labled_img, parsed_content_list = Omniparser.parse(item.base64_image)
     latency = time.time() - start
     print('time:', latency)
     return {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, 'latency': latency}
+
+@app.get("/")
+async def root():
+    return {"message": "Omniparser API ready"}
