@@ -132,7 +132,15 @@ class VLMAgent:
                              sender="bot")
         self.output_callback(f'Set of Marks Screenshot for {colorful_text_vlm}:\n<img src="data:image/png;base64,{parsed_screen["som_image_base64"]}">', sender="bot")
         screen_info = str(parsed_screen['screen_info'])
-        self.output_callback(f'Screen Info for {colorful_text_vlm}:\n{screen_info}', sender="bot")
+        # self.output_callback(f'Screen Info for {colorful_text_vlm}:\n{screen_info}', sender="bot")
+        self.output_callback(
+                    f'<details>'
+                    f'  <summary>Screen Info for {colorful_text_vlm}</summary>'
+                    f'  <pre>{screen_info}</pre>'
+                    f'</details>',
+                    sender="bot"
+                )
+
 
         screenshot_uuid = parsed_screen['screenshot_uuid']
         screen_width, screen_height = parsed_screen['width'], parsed_screen['height']
@@ -155,7 +163,7 @@ class VLMAgent:
             planner_messages[-1]["content"].append(f"{OUTPUT_DIR}/screenshot_{screenshot_uuid}.png")
             planner_messages[-1]["content"].append(f"{OUTPUT_DIR}/screenshot_som_{screenshot_uuid}.png")
 
-        print(f"Sending messages to VLMPlanner : {planner_messages}")
+        # print(f"Sending messages to VLMPlanner : {planner_messages}")
         start = time.time()
         if "gpt" in self.model:
             vlm_response, token_usage = run_oai_interleaved(

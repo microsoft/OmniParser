@@ -1,4 +1,7 @@
 # uvicorn remote_request:app --host 0.0.0.0 --port 8000 --reload
+'''
+python -m remote_request --som_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --device cuda --BOX_TRESHOLD 0.05
+'''
 
 import sys
 import os
@@ -12,14 +15,31 @@ import base64
 import io
 from fastapi import FastAPI
 from pydantic import BaseModel
+import argparse
 
-config = {
-    'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
-    'device': 'cpu',
-    'caption_model_name': 'florence2',
-    'caption_model_path': '../weights/icon_caption_florence',
-    'BOX_TRESHOLD': 0.05
-}
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Omniparser API')
+    parser.add_argument('--som_model_path', type=str, default='../weights/icon_detect_v1_5/model_v1_5.pt', help='Path to the som model')
+    parser.add_argument('--caption_model_name', type=str, default='florence2', help='Name of the caption model')
+    parser.add_argument('--caption_model_path', type=str, default='../weights/icon_caption_florence', help='Path to the caption model')
+    parser.add_argument('--device', type=str, default='cpu', help='Device to run the model')
+    parser.add_argument('--BOX_TRESHOLD', type=float, default=0.05, help='Threshold for box detection')
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host for the API')
+    parser.add_argument('--port', type=int, default=8000, help='Port for the API')
+    args = parser.parse_args()
+    return args
+
+args = parse_arguments()
+config = vars(args)
+
+
+# config = {
+#     'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
+#     'device': 'cpu',
+#     'caption_model_name': 'florence2',
+#     'caption_model_path': '../weights/icon_caption_florence',
+#     'BOX_TRESHOLD': 0.05
+# }
 
 
 class Omniparser(object):
@@ -75,3 +95,8 @@ async def send_text(item: Item):
 @app.get("/")
 async def root():
     return {"message": "Omniparser API ready"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("remote_request:app", host=args.host, port=args.port, reload=True)

@@ -52,7 +52,7 @@ def sampling_loop_sync(
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url and omniparser_url != "localhost:8000" else None)
+    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url else None)
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(

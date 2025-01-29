@@ -1,5 +1,6 @@
 """
 Entrypoint for Gradio, see https://gradio.app/
+python app.py --windows_host_url xxxx:8006/ --omniparser_host_url localhost:8000
 """
 
 import platform
@@ -15,6 +16,7 @@ from pathlib import Path
 from typing import cast, Dict
 from PIL import Image
 import socket
+import argparse
 
 import gradio as gr
 from anthropic import APIResponse
@@ -38,6 +40,18 @@ Welcome to the OmniParser+X Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let 
 
 Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
 '''
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Gradio App")
+    parser.add_argument("--windows_host_url", type=str, default='GCRSANDBOX336.redmond.corp.microsoft.com:8006/') # http://gcrsandbox336.redmond.corp.microsoft.com/
+    parser.add_argument("--omniparser_host_url", type=str, default="localhost:8000")
+    return parser.parse_args()
+args = parse_arguments()
+windows_host_url = args.windows_host_url
+omniparser_host_url = args.omniparser_host_url
+print(f"Windows host URL: {windows_host_url}")
+print(f"OmniParser host URL: {omniparser_host_url}")
+
 
 class Sender(StrEnum):
     USER = "user"
@@ -68,8 +82,8 @@ def setup_state(state):
         state["only_n_most_recent_images"] = 2
     if 'chatbot_messages' not in state:
         state['chatbot_messages'] = []
-    if "omniparser_url" not in state:
-        state["omniparser_url"] = "localhost:8000"
+    # if "omniparser_url" not in state:
+    #     state["omniparser_url"] = "localhost:8000"
 
 async def main(state):
     """Render loop for Gradio"""
@@ -211,7 +225,7 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        omniparser_url=state["omniparser_url"]
+        omniparser_url=omniparser_host_url #state["omniparser_url"]
     ):  
         if loop_msg is None:
             yield state['chatbot_messages']
@@ -275,13 +289,13 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
                     placeholder="Paste your API key here",
                     interactive=True,
                 )
-        with gr.Row():
-            omniparser_url = gr.Textbox(
-                label="OmniParser Base URL",
-                value="localhost:8000",
-                placeholder="Enter OmniParser base URL (e.g. localhost:8000)",
-                interactive=True
-            )
+        # with gr.Row():
+        #     omniparser_url = gr.Textbox(
+        #         label="OmniParser Base URL",
+        #         value="localhost:8000",
+        #         placeholder="Enter OmniParser base URL (e.g. localhost:8000)",
+        #         interactive=True
+        #     )
         # hide_images = gr.Checkbox(label="Hide screenshots", value=False)
 
     with gr.Row():
@@ -294,11 +308,20 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         with gr.Column(scale=1):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
         with gr.Column(scale=3):
-            iframe = gr.HTML(
-                f'<iframe src="http://localhost:8006/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
-                container=False,
-                elem_classes="no-padding"
-            )
+            if not windows_host_url:
+                iframe = gr.HTML(
+                    f'<iframe src="http://localhost:8006/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+                    container=False,
+                    elem_classes="no-padding"
+                )
+            else:
+                # machine_fqdn = socket.getfqdn()
+                # print('machine_fqdn:', machine_fqdn)
+                iframe = gr.HTML(
+                    f'<iframe src="http://{windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+                    container=False,
+                    elem_classes="no-padding"
+                )
 
     def update_model(model_selection, state):
         state["model"] = model_selection
@@ -350,8 +373,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         state["api_key"] = api_key_value
         state[f'{state["provider"]}_api_key'] = api_key_value
 
-    def update_omniparser_url(url_value, state):
-        state["omniparser_url"] = url_value
+    # def update_omniparser_url(url_value, state):
+    #     state["omniparser_url"] = url_value
 
     def clear_chat(state):
         # Reset message-related state
@@ -365,7 +388,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     only_n_images.change(fn=update_only_n_images, inputs=[only_n_images, state], outputs=None)
     provider.change(fn=update_provider, inputs=[provider, state], outputs=api_key)
     api_key.change(fn=update_api_key, inputs=[api_key, state], outputs=None)
-    omniparser_url.change(fn=update_omniparser_url, inputs=[omniparser_url, state], outputs=None)
+    # omniparser_url.change(fn=update_omniparser_url, inputs=[omniparser_url, state], outputs=None)
     chatbot.clear(fn=clear_chat, inputs=[state], outputs=[chatbot])
 
     submit_button.click(process_input, [chat_input, state], chatbot)
