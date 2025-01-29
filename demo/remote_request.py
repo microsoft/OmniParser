@@ -1,6 +1,5 @@
-# uvicorn remote_request:app --host 0.0.0.0 --port 8000 --reload
 '''
-python -m remote_request --som_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --device cuda --BOX_TRESHOLD 0.05
+python -m remote_request --som_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
 '''
 
 import sys
