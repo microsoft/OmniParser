@@ -1,22 +1,23 @@
 '''
-python -m remote_request --som_model_path ../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
+python -m omniparserserver --som_model_path ../../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
 '''
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 from fastapi import FastAPI
 from pydantic import BaseModel
 import argparse
 import uvicorn
-from omniparser import Omniparser
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(root_dir)
+from util.omniparser import Omniparser
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Omniparser API')
-    parser.add_argument('--som_model_path', type=str, default='../weights/icon_detect_v1_5/model_v1_5.pt', help='Path to the som model')
+    parser.add_argument('--som_model_path', type=str, default='../../weights/icon_detect_v1_5/model_v1_5.pt', help='Path to the som model')
     parser.add_argument('--caption_model_name', type=str, default='florence2', help='Name of the caption model')
-    parser.add_argument('--caption_model_path', type=str, default='../weights/icon_caption_florence', help='Path to the caption model')
+    parser.add_argument('--caption_model_path', type=str, default='../../weights/icon_caption_florence', help='Path to the caption model')
     parser.add_argument('--device', type=str, default='cpu', help='Device to run the model')
     parser.add_argument('--BOX_TRESHOLD', type=float, default=0.05, help='Threshold for box detection')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host for the API')
