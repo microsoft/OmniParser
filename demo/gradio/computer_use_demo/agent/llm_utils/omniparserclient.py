@@ -2,7 +2,7 @@ import requests
 import base64
 from pathlib import Path
 from computer_use_demo.tools.screen_capture import get_screenshot
-from computer_use_demo.gui_agent.llm_utils.oai import encode_image
+from computer_use_demo.agent.llm_utils.oai import encode_image
 
 OUTPUT_DIR = "./tmp/outputs"
 

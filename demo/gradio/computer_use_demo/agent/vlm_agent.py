@@ -10,7 +10,7 @@ from anthropic import APIResponse
 from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
-from computer_use_demo.gui_agent.llm_utils.oai import run_oai_interleaved
+from computer_use_demo.agent.llm_utils.oai import run_oai_interleaved
 from computer_use_demo.colorful_text import colorful_text_vlm
 import time
 import re
