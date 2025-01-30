@@ -11,7 +11,6 @@ from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
 from agent.llm_utils.oai import run_oai_interleaved
-from colorful_text import colorful_text_vlm
 import time
 import re
 
@@ -60,14 +59,14 @@ class VLMAgent:
         # Show results of Omniparser
         image_base64 = parsed_screen['original_screenshot_base64']
         latency_omniparser = parsed_screen['latency']
-        self.output_callback(f'Screenshot for {colorful_text_vlm}:\n<img src="data:image/png;base64,{image_base64}">',
+        self.output_callback(f'Screenshot for OmniParser Agent:\n<img src="data:image/png;base64,{image_base64}">',
                              sender="bot")
-        self.output_callback(f'Set of Marks Screenshot for {colorful_text_vlm}:\n<img src="data:image/png;base64,{parsed_screen["som_image_base64"]}">', sender="bot")
+        self.output_callback(f'Set of Marks Screenshot for OmniParser Agent:\n<img src="data:image/png;base64,{parsed_screen["som_image_base64"]}">', sender="bot")
         screen_info = str(parsed_screen['screen_info'])
-        # self.output_callback(f'Screen Info for {colorful_text_vlm}:\n{screen_info}', sender="bot")
+        # self.output_callback(f'Screen Info for OmniParser Agent:\n{screen_info}', sender="bot")
         self.output_callback(
                     f'<details>'
-                    f'  <summary>Screen Info for {colorful_text_vlm}</summary>'
+                    f'  <summary>Screen Info for OmniParser Agent</summary>'
                     f'  <pre>{screen_info}</pre>'
                     f'</details>',
                     sender="bot"
@@ -140,7 +139,7 @@ class VLMAgent:
                 vlm_plan_str += f'{value}'
             else:
                 vlm_plan_str += f'\n{key}: {value}'
-        # self.output_callback(f"{colorful_text_vlm}:\n{vlm_plan_str}", sender="bot")
+        # self.output_callback(f"OmniParser Agent:\n{vlm_plan_str}", sender="bot")
 
         # construct the response so that anthropicExcutor can execute the tool
         response_content = [BetaTextBlock(text=vlm_plan_str, type='text')]
@@ -240,7 +239,7 @@ IMPORTANT NOTES:
         buffered = BytesIO()
         image.save(buffered, format="PNG")
         image_with_circle_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-        self.output_callback(f'Action performed on the red circle with centroid ({x}, {y}), for {colorful_text_vlm}:\n<img src="data:image/png;base64,{image_with_circle_base64}">', sender="bot")
+        self.output_callback(f'Action performed on the red circle with centroid ({x}, {y}), for OmniParser Agent:\n<img src="data:image/png;base64,{image_with_circle_base64}">', sender="bot")
 
 
 def _keep_latest_images(messages):
