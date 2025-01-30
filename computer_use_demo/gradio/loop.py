@@ -96,9 +96,7 @@ def sampling_loop_sync(
     if model == "claude-3-5-sonnet-20241022": # Anthropic loop
         while True:
             parsed_screen = omniparser_client() # parsed_screen: {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, "screen_info"}
-            import pdb; pdb.set_trace()
             screen_info_block = TextBlock(text='Below is the structured accessibility information of the current UI screen, which includes text and icons you can operate on, take these information into account when you are making the prediction for the next action. Note you will still need to take screenshot to get the image: \n' + parsed_screen['screen_info'], type='text')
-            # # messages[-1]['content'].append(screen_info_block)
             screen_info_dict = {"role": "user", "content": [screen_info_block]}
             messages.append(screen_info_dict)
             tools_use_needed = actor(messages=messages)
@@ -121,9 +119,3 @@ def sampling_loop_sync(
         
             if not tool_result_content:
                 return messages
-            
-            # import pdb; pdb.set_trace()
-            # messages.append({"role": "user",
-            #                  "content": ["History plan:\n" + str(vlm_response_json['Reasoning'])]})
-
-            # messages.append({"content": tool_result_content, "role": "user"})

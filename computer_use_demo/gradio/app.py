@@ -1,6 +1,5 @@
 """
-Entrypoint for Gradio, see https://gradio.app/
-python app.py --windows_host_url xxxx:8006/ --omniparser_host_url localhost:8000
+python app.py --windows_host_url localhost:8006/ --omniparser_server_url localhost:8000
 """
 
 import os
@@ -35,13 +34,9 @@ Type a message and press submit to start OmniParser+X. Press the trash icon in t
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Gradio App")
     parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
-    parser.add_argument("--omniparser_host_url", type=str, default="localhost:8000")
+    parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
     return parser.parse_args()
 args = parse_arguments()
-windows_host_url = args.windows_host_url
-omniparser_host_url = args.omniparser_host_url
-print(f"Windows host URL: {windows_host_url}")
-print(f"OmniParser host URL: {omniparser_host_url}")
 
 
 class Sender(StrEnum):
@@ -140,7 +135,6 @@ def chatbot_output_callback(message, chatbot_state, hide_images=False, sender="b
         is_tool_result = not isinstance(message, str) and (
             isinstance(message, ToolResult)
             or message.__class__.__name__ == "ToolResult"
-            or message.__class__.__name__ == "CLIResult"
         )
         if not message or (
             is_tool_result
@@ -214,7 +208,7 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        omniparser_url=omniparser_host_url
+        omniparser_url=args.omniparser_server_url
     ):  
         if loop_msg is None:
             yield state['chatbot_messages']
@@ -289,20 +283,11 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         with gr.Column(scale=1):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
         with gr.Column(scale=3):
-            if not windows_host_url:
-                iframe = gr.HTML(
-                    f'<iframe src="http://localhost:8006/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
-                    container=False,
-                    elem_classes="no-padding"
-                )
-            else:
-                # machine_fqdn = socket.getfqdn()
-                # print('machine_fqdn:', machine_fqdn)
-                iframe = gr.HTML(
-                    f'<iframe src="http://{windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
-                    container=False,
-                    elem_classes="no-padding"
-                )
+            iframe = gr.HTML(
+                f'<iframe src="http://{args.windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+                container=False,
+                elem_classes="no-padding"
+            )
 
     def update_model(model_selection, state):
         state["model"] = model_selection

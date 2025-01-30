@@ -1,11 +1,9 @@
-
 import os
 import logging
 import base64
 import requests
 
 def is_image_path(text):
-    # Checking if the input text ends with typical image file extensions
     image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif")
     if text.endswith(image_extensions):
         return True
@@ -28,7 +26,6 @@ def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max
 
     final_messages = [{"role": "system", "content": system}]
 
-    # image_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
     if type(messages) == list:
         for item in messages:
             contents = []
@@ -56,7 +53,6 @@ def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max
     
     elif isinstance(messages, str):
         final_messages = [{"role": "user", "content": messages}]
-    # import pdb; pdb.set_trace()
 
     print("[oai] sending messages:", {"role": "user", "content": messages})
 
@@ -64,11 +60,8 @@ def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max
         "model": llm,
         "messages": final_messages,
         "max_tokens": max_tokens,
-        "temperature": temperature,
-        # "stop": stop,
+        "temperature": temperature
     }
-
-    # from IPython.core.debugger import Pdb; Pdb().set_trace()
 
     response = requests.post(
         "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
@@ -78,30 +71,6 @@ def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max
         text = response.json()['choices'][0]['message']['content']
         token_usage = int(response.json()['usage']['total_tokens'])
         return text, token_usage
-        
-    # return error message if the response is not successful
     except Exception as e:
         print(f"Error in interleaved openAI: {e}. This may due to your invalid OPENAI_API_KEY. Please check the response: {response.json()} ")
         return response.json()
-
-
-if __name__ == "__main__":
-    
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is not set")
-    
-    text, token_usage = run_oai_interleaved(
-        messages= [{"content": [
-                        "What is in the screenshot?",   
-                        "./tmp/outputs/screenshot_0b04acbb783d4706bc93873d17ba8c05.png"],
-                    "role": "user"
-                    }],
-        llm="gpt-4o-mini",
-        system="You are a helpful assistant",
-        api_key=api_key,
-        max_tokens=256,
-        temperature=0)
-    
-    print(text, token_usage)
-    # There is an introduction describing the Calyx... 36986

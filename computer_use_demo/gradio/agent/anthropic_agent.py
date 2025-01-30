@@ -160,23 +160,3 @@ def _maybe_filter_to_n_most_recent_images(
                         continue
                 new_content.append(content)
             tool_result["content"] = new_content
-            
-            
-
-if __name__ == "__main__":
-    pass
-    # client = Anthropic(api_key="")
-    # response = client.beta.messages.with_raw_response.create(
-    #     max_tokens=4096,
-    #     model="claude-3-5-sonnet-20241022",
-    #     system=SYSTEM_PROMPT,
-    #     # tools=ToolCollection(
-    #     #     ComputerTool(),
-    #     # ).to_params(),
-    #     betas=["computer-use-2024-10-22"],
-    #     messages=[
-    #         {"role": "user", "content": "click on (199, 199)."}
-    #     ],
-    # )
-    
-    # print(f"AnthropicActor response: {response.parse().usage.input_tokens+response.parse().usage.output_tokens}")
