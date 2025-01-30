@@ -19,6 +19,8 @@ from loop import (
     sampling_loop_sync,
 )
 from tools import ToolResult
+import requests
+from requests.exceptions import RequestException
 
 CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
@@ -182,7 +184,32 @@ def chatbot_output_callback(message, chatbot_state, hide_images=False, sender="b
                         for user_msg, bot_msg in chatbot_state]
     # print(f"chatbot_output_callback chatbot_state: {concise_state} (truncated)")
 
+def valid_params(user_input, state):
+    """Validate all requirements and return a list of error messages."""
+    errors = []
+    
+    for server_name, url in [('Windows Host', args.windows_host_url), ('OmniParser Server', args.omniparser_server_url)]:
+        try:
+            url = f'http://{url}/probe'
+            response = requests.get(url, timeout=3)
+            if response.status_code != 200:
+                errors.append(f"{server_name} is not responding")
+        except RequestException as e:
+            errors.append(f"{server_name} is not responding")
+    
+    if not state["api_key"].strip():
+        errors.append("LLM API Key is not set")
+
+    if not user_input:
+        errors.append("no computer use request provided")
+    
+    return errors
+
 def process_input(user_input, state):
+    errors = valid_params(user_input, state)
+    if errors:
+        raise gr.Error("Validation errors: " + ", ".join(errors))
+    
     # Append the user message to state["messages"]
     state["messages"].append(
         {
