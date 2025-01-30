@@ -1,5 +1,5 @@
 """
-python app.py --windows_host_url localhost:8006/ --omniparser_server_url localhost:8000
+python app.py --windows_host_url localhost:8006 --omniparser_server_url localhost:8000
 """
 
 import os
@@ -26,7 +26,7 @@ API_KEY_FILE = CONFIG_DIR / "api_key"
 INTRO_TEXT = '''
 🚀🤖✨ It's Play Time!
 
-Welcome to the OmniParser+X Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
 
 Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
 '''
