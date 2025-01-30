@@ -1,23 +1,16 @@
 import json
-import asyncio
-import platform
 from collections.abc import Callable
-from datetime import datetime
-from enum import StrEnum
-from typing import Any, cast, Dict, Callable
+from typing import cast, Callable
 import uuid
-import requests
 from PIL import Image, ImageDraw
 import base64
 from io import BytesIO
-from pathlib import Path
 
-from anthropic import Anthropic, AnthropicBedrock, AnthropicVertex, APIResponse
-from anthropic.types import TextBlock, ToolResultBlockParam
+from anthropic import APIResponse
+from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
-from computer_use_demo.tools.screen_capture import get_screenshot
-from computer_use_demo.gui_agent.llm_utils.oai import run_oai_interleaved, encode_image
+from computer_use_demo.gui_agent.llm_utils.oai import run_oai_interleaved
 from computer_use_demo.colorful_text import colorful_text_vlm
 import time
 import re
@@ -32,67 +25,6 @@ def extract_data(input_string, data_type):
     matches = re.findall(pattern, input_string, re.DOTALL)
     # Return the first match if exists, trimming whitespace and ignoring potential closing backticks
     return matches[0][0].strip() if matches else input_string
-
-class OmniParser:
-    def __init__(self, 
-                 url: str) -> None:
-        self.url = url
-        if not self.url:
-            config = {
-                        'som_model_path': '../weights/icon_detect_v1_5/model_v1_5.pt',
-                        'device': 'cpu',
-                        'caption_model_name': 'florence2',
-                        'caption_model_path': '../weights/icon_caption_florence',
-                        'BOX_TRESHOLD': 0.05
-                    }
-            from computer_use_demo.omniparser_agent.omniparser import Omniparser as Omniparser_class
-            self.omniparser = Omniparser_class(config=config)
-
-    def __call__(self,):
-        screenshot, screenshot_path = get_screenshot()
-        screenshot_path = str(screenshot_path)
-        image_base64 = encode_image(screenshot_path)
-        if self.url:
-            response = requests.post(self.url, json={"base64_image": image_base64, 'prompt': 'omniparser process'})
-            response_json = response.json()
-        else:
-            start = time.time()
-            dino_labled_img, parsed_content_list = self.omniparser.parse(image_base64)
-            latency = time.time() - start
-            response_json = {
-                'som_image_base64': dino_labled_img,
-                'parsed_content_list': parsed_content_list,
-                'latency': latency
-            }
-
-        som_image_data = base64.b64decode(response_json['som_image_base64'])
-        screenshot_path_uuid = Path(screenshot_path).stem.replace("screenshot_", "")
-        som_screenshot_path = f"{OUTPUT_DIR}/screenshot_som_{screenshot_path_uuid}.png"
-        with open(som_screenshot_path, "wb") as f:
-            f.write(som_image_data)
-        
-        response_json['width'] = screenshot.size[0]
-        response_json['height'] = screenshot.size[1]
-        response_json['original_screenshot_base64'] = image_base64
-        response_json['screenshot_uuid'] = screenshot_path_uuid
-        # example response_json: {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, "latency": 0.1}
-        print('omniparser latency:', response_json['latency'])
-        response_json = self.reformat_messages(response_json)
-        return response_json
-    
-    def reformat_messages(self, response_json: dict):
-        screen_info = ""
-        for idx, element in enumerate(response_json["parsed_content_list"]):
-            element['idx'] = idx
-            if element['type'] == 'text':
-                # screen_info += f'''<p id={idx} class="text" alt="{element['content']}"> </p>\n'''
-                screen_info += f'ID: {idx}, Text: {element["content"]}\n'
-            elif element['type'] == 'icon':
-                # screen_info += f'''<img id={idx} class="icon" alt="{element['content']}"> </img>\n'''
-                screen_info += f'ID: {idx}, Icon: {element["content"]}\n'
-        response_json['screen_info'] = screen_info
-        return response_json
-
 
 class VLMAgent:
     def __init__(

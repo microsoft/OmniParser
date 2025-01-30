@@ -15,9 +15,10 @@ from anthropic.types.beta import (
 )
 from computer_use_demo.tools import ToolResult
 
-from computer_use_demo.gui_agent.anthropic_agent import AnthropicActor
+from computer_use_demo.agent.llm_utils.omniparserclient import OmniParserClient
+from computer_use_demo.agent.anthropic_agent import AnthropicActor
+from computer_use_demo.agent.vlm_agent import VLMAgent
 from computer_use_demo.executor.anthropic_executor import AnthropicExecutor
-from computer_use_demo.omniparser_agent.vlm_agent import OmniParser, VLMAgent
 
 BETA_FLAG = "computer-use-2024-10-22"
 
@@ -52,7 +53,7 @@ def sampling_loop_sync(
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser = OmniParser(url=f"http://{omniparser_url}/send_text/" if omniparser_url else None)
+    omniparser_client = OmniParserClient(url=f"http://{omniparser_url}/parse/")
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(
@@ -94,7 +95,7 @@ def sampling_loop_sync(
     
     if model == "claude-3-5-sonnet-20241022": # Anthropic loop
         while True:
-            parsed_screen = omniparser() # parsed_screen: {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, "screen_info"}
+            parsed_screen = omniparser_client() # parsed_screen: {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, "screen_info"}
             import pdb; pdb.set_trace()
             screen_info_block = TextBlock(text='Below is the structured accessibility information of the current UI screen, which includes text and icons you can operate on, take these information into account when you are making the prediction for the next action. Note you will still need to take screenshot to get the image: \n' + parsed_screen['screen_info'], type='text')
             # # messages[-1]['content'].append(screen_info_block)
@@ -112,7 +113,7 @@ def sampling_loop_sync(
     
     elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
         while True:
-            parsed_screen = omniparser()
+            parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)
 
             for message, tool_result_content in executor(tools_use_needed, messages):
