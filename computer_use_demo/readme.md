@@ -45,7 +45,8 @@ Notes:
    
    g. Continue from here if you already had the conda environment.
    
-   h. Ensure you have the weights downloaded in weights folder. If not download them with `for folder in icon_caption_blip2 icon_caption_florence icon_detect icon_detect_v1_5; do huggingface-cli download microsoft/OmniParser --local-dir weights/"$folder" --repo-type model --include "$folder/*"; done`
+   h. Ensure you have the weights downloaded in weights folder. If not download them with:
+   `for folder in icon_caption_florence icon_detect icon_detect_v1_5; do huggingface-cli download microsoft/OmniParser --local-dir weights/ --repo-type model --include "$folder/*"; done`
    
    h. Navigate to the server directory with `cd OmniParser/computer_use_demo/omniparserserver`
    
