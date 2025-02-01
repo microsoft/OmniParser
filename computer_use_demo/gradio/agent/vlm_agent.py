@@ -165,14 +165,14 @@ class VLMAgent:
                                             name='computer', type='tool_use')
             response_content.append(move_cursor_block)
 
-        if vlm_response_json["Next Action"] == "type":
+        if vlm_response_json["Next Action"] == "None":
+            print("Task paused/completed.")
+        elif vlm_response_json["Next Action"] == "type":
             click_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}', input={'action': 'left_click'}, name='computer', type='tool_use')
             sim_content_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}',
                                         input={'action': vlm_response_json["Next Action"], 'text': vlm_response_json["value"]},
                                         name='computer', type='tool_use')
             response_content.extend([click_block, sim_content_block])
-        elif vlm_response_json["Next Action"] == "None":
-            print("Task paused/completed.")
         else:
             sim_content_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}',
                                             input={'action': vlm_response_json["Next Action"]},
@@ -196,14 +196,14 @@ You should carefully consider your plan base on the task, screenshot, and histor
 Here is the list of all detected bounding boxes by IDs on the screen and their description:{screen_info}
 
 Your available "Next Action" only include:
-- type: type a string of text.
-- left_click: Describe the ui element to be clicked.
-- right_click: Describe the ui element to be right clicked.
-- double_click: Describe the ui element to be double clicked.
-- hover: Describe the ui element to be hovered.
-- scroll_up: Scroll the screen up.
-- scroll_down: Scroll the screen down.
-- wait: Wait for 1 second for the device to load or respond.
+- type: move mouse to box id, left clicks and types a string of text.
+- left_click: move mouse to box id and left clicks
+- right_click: move mouse to box id and right clicks
+- double_click: move mouse to box id and double clicks
+- hover: move mouse to box id
+- scroll_up: scrolls the screen up.
+- scroll_down: scrolls the screen down.
+- wait: waits for 1 second for the device to load or respond.
 
 Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on, and the value (if the action is 'type') in order to complete the task.
 
