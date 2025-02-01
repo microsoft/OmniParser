@@ -48,4 +48,4 @@ async def root():
     return {"message": "Omniparser API ready"}
 
 if __name__ == "__main__":
-    uvicorn.run("remote_request:app", host=args.host, port=args.port, reload=True)
+    uvicorn.run("omniparserserver:app", host=args.host, port=args.port, reload=True)
