@@ -28,12 +28,13 @@ API_KEY_FILE = CONFIG_DIR / "api_key"
 INTRO_TEXT = '''
 🚀🤖✨ It's Play Time!
 
-Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o/4o-mini, Claude, Phi, Llama]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o, R1, Claude]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
 
 Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
 '''
 
 def parse_arguments():
+
     parser = argparse.ArgumentParser(description="Gradio App")
     parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
     parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
@@ -255,11 +256,10 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         }
         </style>
     """)
-    state = gr.State({})  # Use Gradio's state management
+    state = gr.State({})
 
-    setup_state(state.value)  # Initialize the state
-
-    # Retrieve screen details
+    setup_state(state.value)
+    
     gr.Markdown("# OmniParser + ✖️ Demo")
 
     if not os.getenv("HIDE_WARNING", False):
@@ -270,8 +270,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             with gr.Column():
                 model = gr.Dropdown(
                     label="Model",
-                    choices=["omniparser + gpt-4o", "omniparser + phi35v", "claude-3-5-sonnet-20241022"],
-                    value="omniparser + gpt-4o",  # Set to one of the choices
+                    choices=["omniparser + gpt-4o", "omniparser + R1", "claude-3-5-sonnet-20241022"],
+                    value="omniparser + gpt-4o",
                     interactive=True,
                 )
             with gr.Column():
@@ -322,11 +322,14 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         
         if model_selection == "claude-3-5-sonnet-20241022":
             provider_choices = [option.value for option in APIProvider if option.value != "openai"]
-        elif model_selection == "omniparser + gpt-4o" or model_selection == "omniparser + phi35v":
+        elif model_selection == "omniparser + gpt-4o":
             provider_choices = ["openai"]
+        elif model_selection == "omniparser + R1":
+            provider_choices = ["groq"]
         else:
             provider_choices = [option.value for option in APIProvider]
         default_provider_value = provider_choices[0]
+
         provider_interactive = len(provider_choices) > 1
         api_key_placeholder = f"{default_provider_value.title()} API Key"
 

@@ -2,21 +2,9 @@ import os
 import logging
 import base64
 import requests
-
-def is_image_path(text):
-    image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif")
-    if text.endswith(image_extensions):
-        return True
-    else:
-        return False
-
-def encode_image(image_path):
-    """Encode image file to base64."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+from .utils import is_image_path, encode_image
 
 def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max_tokens=256, temperature=0):
-
     api_key = api_key or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set")
@@ -53,8 +41,6 @@ def run_oai_interleaved(messages: list, system: str, llm: str, api_key: str, max
     
     elif isinstance(messages, str):
         final_messages = [{"role": "user", "content": messages}]
-
-    print("[oai] sending messages:", {"role": "user", "content": messages})
 
     payload = {
         "model": llm,

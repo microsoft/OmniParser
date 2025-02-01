@@ -11,6 +11,7 @@ from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
 from agent.llm_utils.oai import run_oai_interleaved
+from agent.llm_utils.groqclient import run_groq_interleaved
 import time
 import re
 
@@ -39,9 +40,12 @@ class VLMAgent:
     ):
         if model == "omniparser + gpt-4o":
             self.model = "gpt-4o-2024-11-20"
+        elif model == "omniparser + R1":
+            self.model = "deepseek-r1-distill-llama-70b"
         else:
             raise ValueError(f"Model {model} not supported")
         
+
         self.provider = provider
         self.api_key = api_key
         self.api_response_callback = api_response_callback
@@ -108,8 +112,17 @@ class VLMAgent:
             print(f"oai token usage: {token_usage}")
             self.total_token_usage += token_usage
             self.total_cost += (token_usage * 0.15 / 1000000)  # https://openai.com/api/pricing/
-        elif "phi" in self.model:
-            pass # TODO
+        elif "r1" in self.model:
+            vlm_response, token_usage = run_groq_interleaved(
+                messages=planner_messages,
+                system=system,
+                llm=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+            )
+            print(f"groq token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 0.99 / 1000000)
         else:
             raise ValueError(f"Model {self.model} not supported")
         latency_vlm = time.time() - start
@@ -168,7 +181,7 @@ class VLMAgent:
         self.api_response_callback(response)
 
     def _get_system_prompt(self, screen_info: str = ""):
-        return f"""
+        main_section = f"""
 You are using a Windows device.
 You are able to use a mouse and keyboard to interact with the computer based on the given task and screenshot.
 You can only interact with the desktop GUI (no terminal or application menu access).
@@ -222,11 +235,27 @@ Another Example:
 
 IMPORTANT NOTES:
 1. You should only give a single action at a time.
+
+"""
+        thinking_model = "r1" in self.model
+        if not thinking_model:
+            main_section += """
 2. You should give an analysis to the current screen, and reflect on what has been done by looking at the history, then describe your step-by-step thoughts on how to achieve the task.
+
+"""
+        else:
+            main_section += """
+2. In <think> XML tags give an analysis to the current screen, and reflect on what has been done by looking at the history, then describe your step-by-step thoughts on how to achieve the task. In <output> XML tags put the next action prediction JSON.
+
+"""
+        main_section += """
 3. Attach the next action prediction in the "Next Action".
 4. You should not include other actions, such as keyboard shortcuts.
 5. When the task is completed, you should say "Next Action": "None" in the json field.
 """ 
+
+        return main_section
+
     def draw_action(self, vlm_response_json, image_base64):
         # draw a circle using the coordinate in parsed_screen['som_image_base64']
         image_data = base64.b64decode(image_base64)
