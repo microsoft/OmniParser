@@ -28,6 +28,8 @@ Action = Literal[
     "double_click",
     "screenshot",
     "cursor_position",
+    "hover",
+    "wait"
 ]
 
 
@@ -213,7 +215,11 @@ class ComputerTool(BaseAnthropicTool):
             elif action == "scroll_down":
                 self.send_to_vm("pyautogui.scroll(-100)")
             return ToolResult(output=f"Performed {action}")
-            
+        if action == "hover":
+            return ToolResult(output=f"Performed {action}")
+        if action == "wait":
+            time.sleep(1)
+            return ToolResult(output=f"Performed {action}")
         raise ToolError(f"Invalid action: {action}")
 
     def send_to_vm(self, action: str):

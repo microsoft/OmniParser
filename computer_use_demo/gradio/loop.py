@@ -64,14 +64,7 @@ def sampling_loop_sync(
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
         )
-
-        # from IPython.core.debugger import Pdb; Pdb().set_trace()
-        executor = AnthropicExecutor(
-            output_callback=output_callback,
-            tool_output_callback=tool_output_callback
-        )
-    
-    elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
+    elif model == "omniparser + gpt-4o" or model == "omniparser + R1":
         actor = VLMAgent(
             model=model,
             provider=provider,
@@ -79,14 +72,12 @@ def sampling_loop_sync(
             api_response_callback=api_response_callback,
             output_callback=output_callback,
         )
-
-        executor = AnthropicExecutor(
-            output_callback=output_callback,
-            tool_output_callback=tool_output_callback,
-        )
-        
     else:
         raise ValueError(f"Model {model} not supported")
+    executor = AnthropicExecutor(
+        output_callback=output_callback,
+        tool_output_callback=tool_output_callback,
+    )
     print(f"Model Inited: {model}, Provider: {provider}")
     
     tool_result_content = None
@@ -109,7 +100,7 @@ def sampling_loop_sync(
 
             messages.append({"content": tool_result_content, "role": "user"})
     
-    elif model == "omniparser + gpt-4o" or model == "omniparser + phi35v":
+    elif model == "omniparser + gpt-4o" or model == "omniparser + R1":
         while True:
             parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)
