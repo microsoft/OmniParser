@@ -28,7 +28,7 @@ API_KEY_FILE = CONFIG_DIR / "api_key"
 INTRO_TEXT = '''
 🚀🤖✨ It's Play Time!
 
-Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o, R1, Claude]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o, R1, Qwen2.5VL, Claude]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
 
 Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
 '''
@@ -189,7 +189,7 @@ def valid_params(user_input, state):
     """Validate all requirements and return a list of error messages."""
     errors = []
     
-    for server_name, url in [('Windows Host', args.windows_host_url), ('OmniParser Server', args.omniparser_server_url)]:
+    for server_name, url in [('Windows Host', 'localhost:5000'), ('OmniParser Server', args.omniparser_server_url)]:
         try:
             url = f'http://{url}/probe'
             response = requests.get(url, timeout=3)
@@ -270,7 +270,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             with gr.Column():
                 model = gr.Dropdown(
                     label="Model",
-                    choices=["omniparser + gpt-4o", "omniparser + R1", "claude-3-5-sonnet-20241022"],
+                    choices=["omniparser + gpt-4o", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022"],
                     value="omniparser + gpt-4o",
                     interactive=True,
                 )
@@ -326,6 +326,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             provider_choices = ["openai"]
         elif model_selection == "omniparser + R1":
             provider_choices = ["groq"]
+        elif model_selection == "omniparser + qwen2.5vl":
+            provider_choices = ["dashscope"]
         else:
             provider_choices = [option.value for option in APIProvider]
         default_provider_value = provider_choices[0]

@@ -2,7 +2,7 @@ from groq import Groq
 import os
 from .utils import is_image_path
 
-def run_groq_interleaved(messages: list, system: str, llm: str, api_key: str, max_tokens=256, temperature=0.6):
+def run_groq_interleaved(messages: list, system: str, model_name: str, api_key: str, max_tokens=256, temperature=0.6):
     """
     Run a chat completion through Groq's API, ignoring any images in the messages.
     """

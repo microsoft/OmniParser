@@ -42,6 +42,8 @@ class VLMAgent:
             self.model = "gpt-4o-2024-11-20"
         elif model == "omniparser + R1":
             self.model = "deepseek-r1-distill-llama-70b"
+        elif model == "omniparser + qwen2.5vl":
+            self.model = "qwen2.5-vl-72b-instruct"
         else:
             raise ValueError(f"Model {model} not supported")
         
@@ -93,9 +95,10 @@ class VLMAgent:
             vlm_response, token_usage = run_oai_interleaved(
                 messages=planner_messages,
                 system=system,
-                llm=self.model,
+                model_name=self.model,
                 api_key=self.api_key,
                 max_tokens=self.max_tokens,
+                provider_base_url="https://api.openai.com/v1",
                 temperature=0,
             )
             print(f"oai token usage: {token_usage}")
@@ -106,13 +109,26 @@ class VLMAgent:
             vlm_response, token_usage = run_groq_interleaved(
                 messages=planner_messages,
                 system=system,
-                llm=self.model,
+                model_name=self.model,
                 api_key=self.api_key,
                 max_tokens=self.max_tokens,
             )
             print(f"groq token usage: {token_usage}")
             self.total_token_usage += token_usage
             self.total_cost += (token_usage * 0.99 / 1000000)
+        elif "qwen" in self.model:
+            vlm_response, token_usage = run_oai_interleaved(
+                messages=planner_messages,
+                system=system,
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=min(2048, self.max_tokens),
+                provider_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                temperature=0,
+            )
+            print(f"qwen token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 2.2 / 1000000)  # https://help.aliyun.com/zh/model-studio/getting-started/models?spm=a2c4g.11186623.0.0.74b04823CGnPv7#fe96cfb1a422a
         else:
             raise ValueError(f"Model {self.model} not supported")
         latency_vlm = time.time() - start

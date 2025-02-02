@@ -64,7 +64,7 @@ def sampling_loop_sync(
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
         )
-    elif model == "omniparser + gpt-4o" or model == "omniparser + R1":
+    elif model == "omniparser + gpt-4o" or model == "omniparser + R1" or model == "omniparser + qwen2.5vl":
         actor = VLMAgent(
             model=model,
             provider=provider,
@@ -100,7 +100,7 @@ def sampling_loop_sync(
 
             messages.append({"content": tool_result_content, "role": "user"})
     
-    elif model == "omniparser + gpt-4o" or model == "omniparser + R1":
+    elif model == "omniparser + gpt-4o" or model == "omniparser + R1" or model == "omniparser + qwen2.5vl":
         while True:
             parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)
