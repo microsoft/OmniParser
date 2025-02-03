@@ -238,12 +238,16 @@ def process_input(user_input, state):
         only_n_most_recent_images=state["only_n_most_recent_images"],
         omniparser_url=args.omniparser_server_url
     ):  
-        if loop_msg is None:
+        if loop_msg is None or state.get("stop"):
             yield state['chatbot_messages']
             print("End of task. Close the loop.")
             break
             
         yield state['chatbot_messages']  # Yield the updated chatbot_messages to update the chatbot UI
+
+def stop_app(state):
+    state["stop"] = True
+    return "App stopped"
 
 with gr.Blocks(theme=gr.themes.Default()) as demo:
     gr.HTML("""
@@ -256,7 +260,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         }
         </style>
     """)
-    state = gr.State({})
+    state = gr.State({"stop": False})
 
     setup_state(state.value)
     
@@ -305,6 +309,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             chat_input = gr.Textbox(show_label=False, placeholder="Type a message to send to Omniparser + X ...", container=False)
         with gr.Column(scale=1, min_width=50):
             submit_button = gr.Button(value="Send", variant="primary")
+        with gr.Column(scale=1, min_width=50):
+            stop_button = gr.Button(value="Stop", variant="secondary")
 
     with gr.Row():
         with gr.Column(scale=1):
@@ -386,6 +392,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     chatbot.clear(fn=clear_chat, inputs=[state], outputs=[chatbot])
 
     submit_button.click(process_input, [chat_input, state], chatbot)
+    stop_button.click(stop_app, [state], None)
     
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7888)
