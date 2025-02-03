@@ -170,8 +170,7 @@ class ComputerTool(BaseAnthropicTool):
                 return ToolResult(output=f"Pressed keys: {text}")
             
             elif action == "type":
-                self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")  # Convert ms to seconds
-                self.send_to_vm("pyautogui.press('enter')")
+                self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
                 screenshot_base64 = (await self.screenshot()).base64_image
                 return ToolResult(output=text, base64_image=screenshot_base64)
 
@@ -261,10 +260,7 @@ class ComputerTool(BaseAnthropicTool):
         width, height = self.target_dimension["width"], self.target_dimension["height"]
         screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height)
         time.sleep(0.7) # avoid async error as actions take time to complete
-        # return ToolResult()
         return ToolResult(base64_image=base64.b64encode(path.read_bytes()).decode())
-        
-        raise ToolError(f"Failed to take screenshot: {path} does not exist.")
 
     def padding_image(self, screenshot):
         """Pad the screenshot to 16:10 aspect ratio, when the aspect ratio is not 16:10."""

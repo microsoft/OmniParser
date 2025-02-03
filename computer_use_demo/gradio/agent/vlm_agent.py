@@ -12,6 +12,7 @@ from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, B
 
 from agent.llm_utils.oai import run_oai_interleaved
 from agent.llm_utils.groqclient import run_groq_interleaved
+from agent.llm_utils.utils import is_image_path
 import time
 import re
 
@@ -79,10 +80,8 @@ class VLMAgent:
 
         # drop looping actions msg, byte image etc
         planner_messages = messages
-        planner_messages = _keep_latest_images(planner_messages)
-        # if self.only_n_most_recent_images:
-        #     _maybe_filter_to_n_most_recent_images(planner_messages, self.only_n_most_recent_images)
-        # print(f"filtered_messages: {planner_messages}\n\n", "full messages:", messages)
+        _remove_som_images(planner_messages)
+        _maybe_filter_to_n_most_recent_images(planner_messages, self.only_n_most_recent_images)
 
         if isinstance(planner_messages[-1], dict):
             if not isinstance(planner_messages[-1]["content"], list):
@@ -103,9 +102,8 @@ class VLMAgent:
             )
             print(f"oai token usage: {token_usage}")
             self.total_token_usage += token_usage
-            self.total_cost += (token_usage * 0.15 / 1000000)  # https://openai.com/api/pricing/
+            self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
         elif "r1" in self.model:
-            print(f"Sending messages to Groq: {planner_messages}")
             vlm_response, token_usage = run_groq_interleaved(
                 messages=planner_messages,
                 system=system,
@@ -184,11 +182,10 @@ class VLMAgent:
         if vlm_response_json["Next Action"] == "None":
             print("Task paused/completed.")
         elif vlm_response_json["Next Action"] == "type":
-            click_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}', input={'action': 'left_click'}, name='computer', type='tool_use')
             sim_content_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}',
                                         input={'action': vlm_response_json["Next Action"], 'text': vlm_response_json["value"]},
                                         name='computer', type='tool_use')
-            response_content.extend([click_block, sim_content_block])
+            response_content.append(sim_content_block)
         else:
             sim_content_block = BetaToolUseBlock(id=f'toolu_{uuid.uuid4()}',
                                             input={'action': vlm_response_json["Next Action"]},
@@ -212,16 +209,16 @@ You should carefully consider your plan base on the task, screenshot, and histor
 Here is the list of all detected bounding boxes by IDs on the screen and their description:{screen_info}
 
 Your available "Next Action" only include:
-- type: move mouse to box id, left clicks and types a string of text.
-- left_click: move mouse to box id and left clicks
-- right_click: move mouse to box id and right clicks
-- double_click: move mouse to box id and double clicks
-- hover: move mouse to box id
+- type: types a string of text.
+- left_click: move mouse to box id and left clicks.
+- right_click: move mouse to box id and right clicks.
+- double_click: move mouse to box id and double clicks.
+- hover: move mouse to box id.
 - scroll_up: scrolls the screen up.
 - scroll_down: scrolls the screen down.
 - wait: waits for 1 second for the device to load or respond.
 
-Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on, and the value (if the action is 'type') in order to complete the task.
+Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on (if action is not 'type', 'hover', 'scroll_up', 'scroll_down', 'wait'), and the value (if the action is 'type') in order to complete the task.
 
 Output format:
 ```json
@@ -275,14 +272,14 @@ IMPORTANT NOTES:
 
         return main_section
 
-def _keep_latest_images(messages):
-    for i in range(len(messages)-1):
-        if isinstance(messages[i]["content"], list):
-            for cnt in messages[i]["content"]:
-                if isinstance(cnt, str):
-                    if cnt.endswith((".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif")):
-                        messages[i]["content"].remove(cnt)
-    return messages
+def _remove_som_images(messages):
+    for msg in messages:
+        msg_content = msg["content"]
+        if isinstance(msg_content, list):
+            msg["content"] = [
+                cnt for cnt in msg_content 
+                if not (isinstance(cnt, str) and 'som' in cnt and is_image_path(cnt))
+            ]
 
 
 def _maybe_filter_to_n_most_recent_images(
@@ -293,42 +290,43 @@ def _maybe_filter_to_n_most_recent_images(
     """
     With the assumption that images are screenshots that are of diminishing value as
     the conversation progresses, remove all but the final `images_to_keep` tool_result
-    images in place, with a chunk of min_removal_threshold to reduce the amount we
-    break the implicit prompt cache.
+    images in place
     """
     if images_to_keep is None:
         return messages
 
-    tool_result_blocks = cast(
-        list[ToolResultBlockParam],
-        [
-            item
-            for message in messages
-            for item in (
-                message["content"] if isinstance(message["content"], list) else []
-            )
-            if isinstance(item, dict) and item.get("type") == "tool_result"
-        ],
-    )
-
-    total_images = sum(
-        1
-        for tool_result in tool_result_blocks
-        for content in tool_result.get("content", [])
-        if isinstance(content, dict) and content.get("type") == "image"
-    )
+    total_images = 0
+    for msg in messages:
+        for cnt in msg.get("content", []):
+            if isinstance(cnt, str) and is_image_path(cnt):
+                total_images += 1
+            elif isinstance(cnt, dict) and cnt.get("type") == "tool_result":
+                for content in cnt.get("content", []):
+                    if isinstance(content, dict) and content.get("type") == "image":
+                        total_images += 1
 
     images_to_remove = total_images - images_to_keep
-    # for better cache behavior, we want to remove in chunks
-    images_to_remove -= images_to_remove % min_removal_threshold
-
-    for tool_result in tool_result_blocks:
-        if isinstance(tool_result.get("content"), list):
+    
+    for msg in messages:
+        msg_content = msg["content"]
+        if isinstance(msg_content, list):
             new_content = []
-            for content in tool_result.get("content", []):
-                if isinstance(content, dict) and content.get("type") == "image":
+            for cnt in msg_content:
+                # Remove images from SOM or screenshot as needed
+                if isinstance(cnt, str) and is_image_path(cnt):
                     if images_to_remove > 0:
                         images_to_remove -= 1
                         continue
-                new_content.append(content)
-            tool_result["content"] = new_content
+                # VLM shouldn't use anthropic screenshot tool so shouldn't have these but in case it does, remove as needed
+                elif isinstance(cnt, dict) and cnt.get("type") == "tool_result":
+                    new_tool_result_content = []
+                    for tool_result_entry in cnt.get("content", []):
+                        if isinstance(tool_result_entry, dict) and tool_result_entry.get("type") == "image":
+                            if images_to_remove > 0:
+                                images_to_remove -= 1
+                                continue
+                        new_tool_result_content.append(tool_result_entry)
+                    cnt["content"] = new_tool_result_content
+                # Append fixed content to current message's content list
+                new_content.append(cnt)
+            msg["content"] = new_content
