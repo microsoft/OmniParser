@@ -21,13 +21,12 @@ from loop import (
 from tools import ToolResult
 import requests
 from requests.exceptions import RequestException
+import base64
 
 CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 
 INTRO_TEXT = '''
-<img src="../../imgs/header_bar.png" alt="OmniTool Header" width="100%">
-
 Welcome to OmniTool - the OmniParser+X Computer Use Demo! X = [OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet)].
 
 OmniParser lets you turn any vision-langauge model into an AI agent.
@@ -258,6 +257,19 @@ def stop_app(state):
     state["stop"] = True
     return "App stopped"
 
+def get_header_image_base64():
+    try:
+        # Get the absolute path to the image relative to this script
+        script_dir = Path(__file__).parent
+        image_path = script_dir.parent.parent / "imgs" / "header_bar.png"
+        
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode()
+            return f'data:image/png;base64,{encoded_string}'
+    except Exception as e:
+        print(f"Failed to load header image: {e}")
+        return None
+
 with gr.Blocks(theme=gr.themes.Default()) as demo:
     gr.HTML("""
         <style>
@@ -273,7 +285,12 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     
     setup_state(state.value)
     
-    gr.Markdown("# OmniTool")
+    header_image = get_header_image_base64()
+    if header_image:
+        gr.HTML(f'<img src="{header_image}" alt="OmniTool Header" width="100%">')
+        gr.HTML('<h1 style="text-align: center; font-weight: normal;">Omni<span style="font-weight: bold;">Tool</span></h1>')
+    else:
+        gr.Markdown("# OmniTool")
 
     if not os.getenv("HIDE_WARNING", False):
         gr.Markdown(INTRO_TEXT)
