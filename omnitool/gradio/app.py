@@ -26,11 +26,11 @@ CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 
 INTRO_TEXT = '''
-🚀🤖✨ It's Play Time!
+Welcome to OmniTool - the OmniParser+X Computer Use Demo! X = [OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet)].
 
-Welcome to the OmniParser+X Computer Use Demo! X = [GPT family (4o/o1/o3-mini), Claude, deepseek R1/V3, Qwen-2.5VL]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+OmniParser lets you turn any vision-langauge model into an AI agent.
 
-Type a message and press submit to start OmniParser+X. Press stop to pause, and press the trash icon in the chat to clear the message history.
+Type a message and press submit to start OmniTool. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
 
 def parse_arguments():
@@ -271,7 +271,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     
     setup_state(state.value)
     
-    gr.Markdown("# OmniParser + ✖️ Demo")
+    gr.Markdown("# OmniTool")
 
     if not os.getenv("HIDE_WARNING", False):
         gr.Markdown(INTRO_TEXT)
