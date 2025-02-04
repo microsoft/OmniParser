@@ -28,9 +28,9 @@ API_KEY_FILE = CONFIG_DIR / "api_key"
 INTRO_TEXT = '''
 🚀🤖✨ It's Play Time!
 
-Welcome to the OmniParser+X Computer Use Demo! X = [GPT-4o, R1, Qwen2.5VL, Claude]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
+Welcome to the OmniParser+X Computer Use Demo! X = [GPT family (4o/o1/o3-mini), Claude, deepseek R1/V3, Qwen-2.5VL]. Let OmniParser turn your general purpose vision-langauge model to an AI agent.
 
-Type a message and press submit to start OmniParser+X. Press the trash icon in the chat to clear the message history.
+Type a message and press submit to start OmniParser+X. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
 
 def parse_arguments():
@@ -71,6 +71,8 @@ def setup_state(state):
         state["only_n_most_recent_images"] = 2
     if 'chatbot_messages' not in state:
         state['chatbot_messages'] = []
+    if 'stop' not in state:
+        state['stop'] = False
 
 async def main(state):
     """Render loop for Gradio"""
@@ -207,6 +209,10 @@ def valid_params(user_input, state):
     return errors
 
 def process_input(user_input, state):
+    # Reset the stop flag
+    if state["stop"]:
+        state["stop"] = False
+
     errors = valid_params(user_input, state)
     if errors:
         raise gr.Error("Validation errors: " + ", ".join(errors))
@@ -260,8 +266,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         }
         </style>
     """)
-    state = gr.State({"stop": False})
-
+    state = gr.State({})
+    
     setup_state(state.value)
     
     gr.Markdown("# OmniParser + ✖️ Demo")

@@ -159,7 +159,7 @@ class VLMAgent:
         self.output_callback(f'<img src="data:image/png;base64,{img_to_show_base64}">', sender="bot")
         self.output_callback(
                     f'<details>'
-                    f'  <summary>Screen Info for OmniParser Agent</summary>'
+                    f'  <summary>Parsed Screen elemetns by OmniParser</summary>'
                     f'  <pre>{screen_info}</pre>'
                     f'</details>',
                     sender="bot"

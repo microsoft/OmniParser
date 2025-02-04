@@ -1,6 +1,6 @@
 # OmniParser+X Computer Use Demo
 
-Control a Windows 11 VM with OmniParser+X (X = [GPT-4o/4o-mini, Claude, ...]).
+Control a Windows 11 VM with OmniParser+X (X = [GPT family (4o/o1/o3-mini), Claude, deepseek R1/V3, Qwen-2.5VL]).
 <p align="center">
   <img src="../imgs/som_overlaid_omni.png" alt="OmniParser+X Computer Use Demo screenshot">
 </p>
