@@ -242,6 +242,7 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
+        max_tokens=16384,
         omniparser_url=args.omniparser_server_url
     ):  
         if loop_msg is None or state.get("stop"):
@@ -280,7 +281,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             with gr.Column():
                 model = gr.Dropdown(
                     label="Model",
-                    choices=["omniparser + gpt-4o", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022"],
+                    choices=["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022"],
                     value="omniparser + gpt-4o",
                     interactive=True,
                 )
@@ -334,7 +335,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         
         if model_selection == "claude-3-5-sonnet-20241022":
             provider_choices = [option.value for option in APIProvider if option.value != "openai"]
-        elif model_selection == "omniparser + gpt-4o":
+        elif model_selection in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini"]):
             provider_choices = ["openai"]
         elif model_selection == "omniparser + R1":
             provider_choices = ["groq"]

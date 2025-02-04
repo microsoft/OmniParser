@@ -64,13 +64,15 @@ def sampling_loop_sync(
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
         )
-    elif model == "omniparser + gpt-4o" or model == "omniparser + R1" or model == "omniparser + qwen2.5vl":
+    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl"]):
         actor = VLMAgent(
             model=model,
             provider=provider,
             api_key=api_key,
             api_response_callback=api_response_callback,
             output_callback=output_callback,
+            max_tokens=max_tokens,
+            only_n_most_recent_images=only_n_most_recent_images
         )
     else:
         raise ValueError(f"Model {model} not supported")
@@ -100,7 +102,7 @@ def sampling_loop_sync(
 
             messages.append({"content": tool_result_content, "role": "user"})
     
-    elif model == "omniparser + gpt-4o" or model == "omniparser + R1" or model == "omniparser + qwen2.5vl":
+    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl"]):
         while True:
             parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)

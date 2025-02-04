@@ -10,7 +10,7 @@ from anthropic import APIResponse
 from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
-from agent.llm_utils.oai import run_oai_interleaved
+from agent.llm_utils.oaiclient import run_oai_interleaved
 from agent.llm_utils.groqclient import run_groq_interleaved
 from agent.llm_utils.utils import is_image_path
 import time
@@ -45,6 +45,10 @@ class VLMAgent:
             self.model = "deepseek-r1-distill-llama-70b"
         elif model == "omniparser + qwen2.5vl":
             self.model = "qwen2.5-vl-72b-instruct"
+        elif model == "omniparser + o1":
+            self.model = "o1"
+        elif model == "omniparser + o3-mini":
+            self.model = "o3-mini"
         else:
             raise ValueError(f"Model {model} not supported")
         
@@ -69,9 +73,6 @@ class VLMAgent:
         latency_omniparser = parsed_screen['latency']
         self.output_callback(f'-- Step {self.step_count}: --', sender="bot")
         screen_info = str(parsed_screen['screen_info'])
-
-
-
         screenshot_uuid = parsed_screen['screenshot_uuid']
         screen_width, screen_height = parsed_screen['width'], parsed_screen['height']
 
@@ -90,7 +91,7 @@ class VLMAgent:
             planner_messages[-1]["content"].append(f"{OUTPUT_DIR}/screenshot_som_{screenshot_uuid}.png")
 
         start = time.time()
-        if "gpt" in self.model:
+        if "gpt" in self.model or "o1" in self.model or "o3-mini" in self.model:
             vlm_response, token_usage = run_oai_interleaved(
                 messages=planner_messages,
                 system=system,
@@ -102,7 +103,12 @@ class VLMAgent:
             )
             print(f"oai token usage: {token_usage}")
             self.total_token_usage += token_usage
-            self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
+            if 'gpt' in self.model:
+                self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o1' in self.model:
+                self.total_cost += (token_usage * 15 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o3-mini' in self.model:
+                self.total_cost += (token_usage * 1.1 / 1000000)  # https://openai.com/api/pricing/
         elif "r1" in self.model:
             vlm_response, token_usage = run_groq_interleaved(
                 messages=planner_messages,
