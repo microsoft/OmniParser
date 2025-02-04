@@ -26,6 +26,8 @@ CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 
 INTRO_TEXT = '''
+<img src="../../imgs/header_bar.png" alt="OmniTool Header" width="100%">
+
 Welcome to OmniTool - the OmniParser+X Computer Use Demo! X = [OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet)].
 
 OmniParser lets you turn any vision-langauge model into an AI agent.

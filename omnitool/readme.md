@@ -10,14 +10,14 @@ There are three components:
 
 <table style="border-collapse: collapse; border: none;">
   <tr>
-    <td style="border: none;"><img src="../imgs/omniboxicon.png" width="50"></td>
-    <td style="border: none;"><strong>omnibox</strong></td>
-    <td style="border: none;">A Windows 11 VM running in a Docker container.</td>
-  </tr>
-  <tr>
     <td style="border: none;"><img src="../imgs/omniparsericon.png" width="50"></td>
     <td style="border: none;"><strong>omniparserserver</strong></td>
     <td style="border: none;">FastAPI server running OmniParser V2.</td>
+  </tr>
+  <tr>
+    <td style="border: none;"><img src="../imgs/omniboxicon.png" width="50"></td>
+    <td style="border: none;"><strong>omnibox</strong></td>
+    <td style="border: none;">A Windows 11 VM running in a Docker container.</td>
   </tr>
   <tr>
     <td style="border: none;"><img src="../imgs/gradioicon.png" width="50"></td>
@@ -26,31 +26,15 @@ There are three components:
   </tr>
 </table>
 
-<!-- 1. **omnibox**: A Windows 11 VM running in a Docker container
-2. **omniparserserver**: FastAPI server running OmniParser V2
-3. **gradio**: UI where you can provide commands and watch OmniParser+X reasoning and executing on the Windows 11 VM -->
-
 Notes:
 
-1. The Windows 11 VM docker is dependent on KVM so can only run quickly on Windows and Linux. This can run on a CPU machine (doesn't need GPU).
-2. Though OmniParser can run on a CPU, we have separated this out if you want to run it fast on a GPU machine
+1. Though OmniParser can run on a CPU, we have separated this out if you want to run it fast on a GPU machine
+2. The Windows 11 VM docker is dependent on KVM so can only run quickly on Windows and Linux. This can run on a CPU machine (doesn't need GPU).
 3. The Gradio UI can also run on a CPU machine. We suggest running **omnibox** and **gradio** on the same CPU machine and **omniparserserver** on a GPU server.
 
 ## Setup
 
-1. **omnibox**:
-
-   a. Install Docker Desktop
-
-   b. Visit [Microsoft Evaluation Center](https://info.microsoft.com/ww-landing-windows-11-enterprise.html), accept the Terms of Service, and download a **Windows 11 Enterprise Evaluation (90-day trial, English, United States)** ISO file [~6GB]. Rename the file to `custom.iso` and copy it to the directory `OmniParser/omnitool/omnibox/vm/win11iso`
-
-   c. Navigate to vm management script directory with`cd OmniParser/omnitool/omnibox/scripts`
-
-   d. Build the docker container [400MB] and install the ISO to a storage folder [20GB] with `./manage_vm.sh create`
-
-   e. After creating the first time it will store a save of the VM state in `vm/win11storage`. You can then manage the VM with `./manage_vm.sh start` and `./manage_vm.sh stop`. To delete the VM, use `./manage_vm.sh delete` and delete the `OmniParser/omnitool/omnibox/vm/win11storage` directory.
-
-2. **omniparserserver**:
+1. **omniparserserver**:
 
    a. If you already have a conda environment for OmniParser, you can use that. Else follow the following steps to create one
 
@@ -73,6 +57,18 @@ Notes:
 
    i. Start the server with `python -m omniparserserver`
 
+2. **omnibox**:
+
+   a. Install Docker Desktop
+
+   b. Visit [Microsoft Evaluation Center](https://info.microsoft.com/ww-landing-windows-11-enterprise.html), accept the Terms of Service, and download a **Windows 11 Enterprise Evaluation (90-day trial, English, United States)** ISO file [~6GB]. Rename the file to `custom.iso` and copy it to the directory `OmniParser/omnitool/omnibox/vm/win11iso`
+
+   c. Navigate to vm management script directory with`cd OmniParser/omnitool/omnibox/scripts`
+
+   d. Build the docker container [400MB] and install the ISO to a storage folder [20GB] with `./manage_vm.sh create`
+
+   e. After creating the first time it will store a save of the VM state in `vm/win11storage`. You can then manage the VM with `./manage_vm.sh start` and `./manage_vm.sh stop`. To delete the VM, use `./manage_vm.sh delete` and delete the `OmniParser/omnitool/omnibox/vm/win11storage` directory.
+
 3. **gradio**:
 
    a. Navigate to the gradio directory with `cd OmniParser/omnitool/gradio`
@@ -81,4 +77,4 @@ Notes:
 
    c. Start the server with `python app.py --windows_host_url localhost:8006 --omniparser_server_url localhost:8000`
 
-   d. Open the URL in the terminal output, set your API Key from OpenAI and start playing with the AI agent!
+   d. Open the URL in the terminal output, set your API Key and start playing with the AI agent!
