@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="../imgs/header_bar.png" alt="OmniParser+X Computer Use Demo screenshot">
-</p>
+<img src="../imgs/header_bar.png" alt="OmniTool Header" width="100%">
 
 # OmniTool
 
@@ -10,9 +8,27 @@ Control a Windows 11 VM with OmniParser+X (OpenAI (4o/o1/o3-mini), DeepSeek (R1)
 
 There are three components:
 
-1. **omnibox**: A Windows 11 VM running in a Docker container
+<table style="border-collapse: collapse; border: none;">
+  <tr>
+    <td style="border: none;"><img src="../imgs/omniboxicon.png" width="50"></td>
+    <td style="border: none;"><strong>omnibox</strong></td>
+    <td style="border: none;">A Windows 11 VM running in a Docker container.</td>
+  </tr>
+  <tr>
+    <td style="border: none;"><img src="../imgs/omniparsericon.png" width="50"></td>
+    <td style="border: none;"><strong>omniparserserver</strong></td>
+    <td style="border: none;">FastAPI server running OmniParser V2.</td>
+  </tr>
+  <tr>
+    <td style="border: none;"><img src="../imgs/gradioicon.png" width="50"></td>
+    <td style="border: none;"><strong>gradio</strong></td>
+    <td style="border: none;">UI to provide commands and watch reasoning + execution on OmniBox</td>
+  </tr>
+</table>
+
+<!-- 1. **omnibox**: A Windows 11 VM running in a Docker container
 2. **omniparserserver**: FastAPI server running OmniParser V2
-3. **gradio**: UI where you can provide commands and watch OmniParser+X reasoning and executing on the Windows 11 VM
+3. **gradio**: UI where you can provide commands and watch OmniParser+X reasoning and executing on the Windows 11 VM -->
 
 Notes:
 
