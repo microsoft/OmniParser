@@ -259,7 +259,7 @@ def get_header_image_base64():
     try:
         # Get the absolute path to the image relative to this script
         script_dir = Path(__file__).parent
-        image_path = script_dir.parent.parent / "imgs" / "header_bar_thin.png"
+        image_path = script_dir.parent.parent / "imgs" / "header_bar_small.png"
         
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
@@ -285,7 +285,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     
     header_image = get_header_image_base64()
     if header_image:
-        gr.HTML(f'<img src="{header_image}" alt="OmniTool Header" width="100%">')
+        gr.HTML(f'<img src="{header_image}" alt="OmniTool Header" width="100%">', elem_classes="no-padding")
         gr.HTML('<h1 style="text-align: center; font-weight: normal;">Omni<span style="font-weight: bold;">Tool</span></h1>')
     else:
         gr.Markdown("# OmniTool")
