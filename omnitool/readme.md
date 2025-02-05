@@ -26,10 +26,13 @@ There are three components:
   </tr>
 </table>
 
-Notes:
+## Highlights:
+1. **OmniParser V2** is 60% faster than V1 and now understands a wide variety of OS, app and inside app icons!
+2. **OmniBox** uses 50% less disk space than other Windows VMs for agent testing, whilst providing the same computer use API
 
-1. Though OmniParser can run on a CPU, we have separated this out if you want to run it fast on a GPU machine
-2. The Windows 11 VM docker is dependent on KVM so can only run quickly on Windows and Linux. This can run on a CPU machine (doesn't need GPU).
+## Notes:
+1. Though **OmniParser V2** can run on a CPU, we have separated this out if you want to run it fast on a GPU machine
+2. The **OmniBox** Windows 11 VM docker is dependent on KVM so can only run quickly on Windows and Linux. This can run on a CPU machine (doesn't need GPU).
 3. The Gradio UI can also run on a CPU machine. We suggest running **omnibox** and **gradio** on the same CPU machine and **omniparserserver** on a GPU server.
 
 ## Setup
