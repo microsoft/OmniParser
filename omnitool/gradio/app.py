@@ -261,7 +261,7 @@ def get_header_image_base64():
     try:
         # Get the absolute path to the image relative to this script
         script_dir = Path(__file__).parent
-        image_path = script_dir.parent.parent / "imgs" / "header_bar.png"
+        image_path = script_dir.parent.parent / "imgs" / "header_bar_thin.png"
         
         with open(image_path, "rb") as image_file:
             encoded_string = base64.b64encode(image_file.read()).decode()
