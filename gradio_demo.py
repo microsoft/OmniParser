@@ -8,7 +8,7 @@ import io
 
 
 import base64, os
-from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
 
@@ -16,8 +16,6 @@ from PIL import Image
 yolo_model = get_yolo_model(model_path='weights/icon_detect_v1_5/best.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
 # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
-
-
 
 MARKDOWN = """
 # OmniParser for Pure Vision Based General GUI Agent 🔥
@@ -64,8 +62,6 @@ def process(
     parsed_content_list = '\n'.join([f'icon {i}: ' + str(v) for i,v in enumerate(parsed_content_list)])
     # parsed_content_list = str(parsed_content_list)
     return image, str(parsed_content_list)
-
-
 
 with gr.Blocks() as demo:
     gr.Markdown(MARKDOWN)
