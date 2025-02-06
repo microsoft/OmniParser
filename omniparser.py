@@ -1,4 +1,4 @@
-from utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor,  get_dino_model, get_yolo_model
+from utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
 import torch
 from ultralytics import YOLO
 from PIL import Image
