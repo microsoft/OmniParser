@@ -85,11 +85,10 @@ There are three components:
 
    d. Open the URL in the terminal output, set your API Key and start playing with the AI agent!
 
-
-
 ## Risks and Mitigations
-To align with the Microsoft AI principles and Responsible AI practices, we conduct risk mitigation by training the icon caption model with Responsible AI data, which helps the model avoid inferring sensitive attributes (e.g.race, religion etc.) of the individuals which happen to be in icon images as much as possible. At the same time, we encourage user to apply OmniParser only for screenshot that does not contain harmful/violent content. For the OmniTool, we conduct threat model analysis using Microsoft Threat Modeling Tool overview - Azure | Microsoft Learn. We provide a sandbox docker container, and provide safety guidance and examples in our GitHub Repository. We advise human to stay in the loop in order to minimize risk.
+To align with the Microsoft AI principles and Responsible AI practices, we conduct risk mitigation by training the icon caption model with Responsible AI data, which helps the model avoid inferring sensitive attributes (e.g.race, religion etc.) of the individuals which happen to be in icon images as much as possible. At the same time, we encourage user to apply OmniParser only for screenshot that does not contain harmful/violent content. For the OmniTool, we conduct threat model analysis using Microsoft Threat Modeling Tool. We advise human to stay in the loop in order to minimize risk.
+
 
 ## Acknowledgment 
-Kudos to the amazing resources that are indispensable in the development of our code: [Claude Computer Use](https://github.com/anthropics/anthropic-quickstarts/blob/main/computer-use-demo/README.md), [OS World](https://github.com/xlang-ai/OSWorld), [Windows Agent Arena](https://github.com/microsoft/WindowsAgentArena), and [computer_use_ootb](https://github.com/showlab/computer_use_ootb).
+Kudos to the amazing resources that are invaluable in the development of our code: [Claude Computer Use](https://github.com/anthropics/anthropic-quickstarts/blob/main/computer-use-demo/README.md), [OS World](https://github.com/xlang-ai/OSWorld), [Windows Agent Arena](https://github.com/microsoft/WindowsAgentArena), and [computer_use_ootb](https://github.com/showlab/computer_use_ootb).
 We are grateful for helpful suggestions and feedbacks provided by Francesco Bonacci, Jianwei Yang, Dillon DuPont, Yue Wu, Anh Nguyen. 
