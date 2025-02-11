@@ -148,20 +148,24 @@ class VLMAgent:
 
         img_to_show_base64 = parsed_screen["som_image_base64"]
         if "Box ID" in vlm_response_json:
-            bbox = parsed_screen["parsed_content_list"][int(vlm_response_json["Box ID"])]["bbox"]
-            vlm_response_json["box_centroid_coordinate"] = [int((bbox[0] + bbox[2]) / 2 * screen_width), int((bbox[1] + bbox[3]) / 2 * screen_height)]
-            img_to_show_data = base64.b64decode(img_to_show_base64)
-            img_to_show = Image.open(BytesIO(img_to_show_data))
+            try:
+                bbox = parsed_screen["parsed_content_list"][int(vlm_response_json["Box ID"])]["bbox"]
+                vlm_response_json["box_centroid_coordinate"] = [int((bbox[0] + bbox[2]) / 2 * screen_width), int((bbox[1] + bbox[3]) / 2 * screen_height)]
+                img_to_show_data = base64.b64decode(img_to_show_base64)
+                img_to_show = Image.open(BytesIO(img_to_show_data))
 
-            draw = ImageDraw.Draw(img_to_show)
-            x, y = vlm_response_json["box_centroid_coordinate"] 
-            radius = 10
-            draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill='red')
-            draw.ellipse((x - radius*3, y - radius*3, x + radius*3, y + radius*3), fill=None, outline='red', width=2)
+                draw = ImageDraw.Draw(img_to_show)
+                x, y = vlm_response_json["box_centroid_coordinate"] 
+                radius = 10
+                draw.ellipse((x - radius, y - radius, x + radius, y + radius), fill='red')
+                draw.ellipse((x - radius*3, y - radius*3, x + radius*3, y + radius*3), fill=None, outline='red', width=2)
 
-            buffered = BytesIO()
-            img_to_show.save(buffered, format="PNG")
-            img_to_show_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                buffered = BytesIO()
+                img_to_show.save(buffered, format="PNG")
+                img_to_show_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            except:
+                print(f"Error parsing: {vlm_response_json}")
+                pass
         self.output_callback(f'<img src="data:image/png;base64,{img_to_show_base64}">', sender="bot")
         self.output_callback(
                     f'<details>'
@@ -220,11 +224,11 @@ Your available "Next Action" only include:
 - right_click: move mouse to box id and right clicks.
 - double_click: move mouse to box id and double clicks.
 - hover: move mouse to box id.
-- scroll_up: scrolls the screen up.
-- scroll_down: scrolls the screen down.
+- scroll_up: scrolls the screen up to view previous content.
+- scroll_down: scrolls the screen down, when the desired button is not visible, or you need to see more content. 
 - wait: waits for 1 second for the device to load or respond.
 
-Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on (if action is not 'type', 'hover', 'scroll_up', 'scroll_down', 'wait'), and the value (if the action is 'type') in order to complete the task.
+Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on (if action is one of 'type', 'hover', 'scroll_up', 'scroll_down', 'wait', there should be no Box ID field), and the value (if the action is 'type') in order to complete the task.
 
 Output format:
 ```json
@@ -255,6 +259,14 @@ Another Example:
 }}
 ```
 
+Another Example:
+```json
+{{
+    "Reasoning": "The current screen does not show 'submit' button, I need to scroll down to see if the button is available.",
+    "Next Action": "scroll_down",
+}}
+```
+
 IMPORTANT NOTES:
 1. You should only give a single action at a time.
 
@@ -274,6 +286,9 @@ IMPORTANT NOTES:
 3. Attach the next action prediction in the "Next Action".
 4. You should not include other actions, such as keyboard shortcuts.
 5. When the task is completed, don't complete additional actions. You should say "Next Action": "None" in the json field.
+6. The tasks involve buying multiple products or navigating through multiple pages. You should break it into subgoals and complete each subgoal one by one in the order of the instructions.
+7. avoid choosing the same action/elements multiple times in a row, if it happens, reflect to yourself, what may have gone wrong, and predict a different action.
+8. If you are prompted with login information page or captcha page, or you think it need user's permission to do the next action, you should say "Next Action": "None" in the json field.
 """ 
 
         return main_section
