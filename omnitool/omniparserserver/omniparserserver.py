@@ -1,5 +1,5 @@
 '''
-python -m omniparserserver --som_model_path ../../weights/icon_detect_v1_5/model_v1_5.pt --caption_model_name florence2 --caption_model_path ../../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
+python -m omniparserserver --som_model_path ../../weights/icon_detect/model.pt --caption_model_name florence2 --caption_model_path ../../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
 '''
 
 import sys
@@ -15,7 +15,7 @@ from util.omniparser import Omniparser
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Omniparser API')
-    parser.add_argument('--som_model_path', type=str, default='../../weights/icon_detect_v1_5/model_v1_5.pt', help='Path to the som model')
+    parser.add_argument('--som_model_path', type=str, default='../../weights/icon_detect/model.pt', help='Path to the som model')
     parser.add_argument('--caption_model_name', type=str, default='florence2', help='Name of the caption model')
     parser.add_argument('--caption_model_path', type=str, default='../../weights/icon_caption_florence', help='Path to the caption model')
     parser.add_argument('--device', type=str, default='cpu', help='Device to run the model')
