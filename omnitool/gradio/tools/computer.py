@@ -170,7 +170,10 @@ class ComputerTool(BaseAnthropicTool):
                 return ToolResult(output=f"Pressed keys: {text}")
             
             elif action == "type":
+                # default click before type TODO: check if this is needed
+                self.send_to_vm("pyautogui.click()")
                 self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
+                self.send_to_vm("pyautogui.press('enter')")
                 screenshot_base64 = (await self.screenshot()).base64_image
                 return ToolResult(output=text, base64_image=screenshot_base64)
 
