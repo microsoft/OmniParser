@@ -8,12 +8,13 @@ import io
 
 
 import base64, os
-from utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
-import argparse
 
-
+yolo_model = get_yolo_model(model_path='weights/icon_detect/model.pt')
+caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
+# caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
 
 MARKDOWN = """
 # OmniParser for Pure Vision Based General GUI Agent 🔥
@@ -36,9 +37,9 @@ def process(
     box_threshold,
     iou_threshold,
     use_paddleocr,
-    imgsz,
-    icon_process_batch_size,
+    imgsz
 ) -> Optional[Image.Image]:
+
     image_save_path = 'imgs/saved_image_demo.png'
     image_input.save(image_save_path)
     image = Image.open(image_save_path)
@@ -54,26 +55,12 @@ def process(
     ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
     text, ocr_bbox = ocr_bbox_rslt
     # print('prompt:', prompt)
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz, batch_size=icon_process_batch_size)  
+    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz,)  
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
-    # parsed_content_list = '\n'.join(parsed_content_list)
-    parsed_content_list = '\n'.join([f'type: {x['type']}, content: {x["content"]}, interactivity: {x["interactivity"]}' for x in parsed_content_list])
+    parsed_content_list = '\n'.join([f'icon {i}: ' + str(v) for i,v in enumerate(parsed_content_list)])
+    # parsed_content_list = str(parsed_content_list)
     return image, str(parsed_content_list)
-
-
-parser = argparse.ArgumentParser(description='Process model paths and names.')
-parser.add_argument('--icon_detect_model', type=str, required=True, default='weights/icon_detect/best.pt', help='Path to the YOLO model weights')
-parser.add_argument('--icon_caption_model', type=str, required=True, default='florence2',  help='Name of the caption model')
-
-args = parser.parse_args()
-icon_detect_model, icon_caption_model = args.icon_detect_model, args.icon_caption_model
-
-yolo_model = get_yolo_model(model_path=icon_detect_model)
-if icon_caption_model == 'florence2':
-    caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
-elif icon_caption_model == 'blip2':
-    caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
 
 with gr.Blocks() as demo:
     gr.Markdown(MARKDOWN)
@@ -88,11 +75,9 @@ with gr.Blocks() as demo:
             iou_threshold_component = gr.Slider(
                 label='IOU Threshold', minimum=0.01, maximum=1.0, step=0.01, value=0.1)
             use_paddleocr_component = gr.Checkbox(
-                label='Use PaddleOCR', value=False)
+                label='Use PaddleOCR', value=True)
             imgsz_component = gr.Slider(
-                label='Icon Detect Image Size', minimum=640, maximum=3200, step=32, value=1920)
-            icon_process_batch_size_component = gr.Slider(
-                label='Icon Process Batch Size', minimum=1, maximum=256, step=1, value=64)
+                label='Icon Detect Image Size', minimum=640, maximum=1920, step=32, value=640)
             submit_button_component = gr.Button(
                 value='Submit', variant='primary')
         with gr.Column():
@@ -106,16 +91,10 @@ with gr.Blocks() as demo:
             box_threshold_component,
             iou_threshold_component,
             use_paddleocr_component,
-            imgsz_component,
-            icon_process_batch_size_component
+            imgsz_component
         ],
         outputs=[image_output_component, text_output_component]
     )
 
 # demo.launch(debug=False, show_error=True, share=True)
 demo.launch(share=True, server_port=7861, server_name='0.0.0.0')
-
-
-
-# python gradio_demo.py --icon_detect_model weights/icon_detect/best.pt --icon_caption_model florence2
-# python gradio_demo.py --icon_detect_model weights/icon_detect_v1_5/model_v1_5.pt --icon_caption_model florence2

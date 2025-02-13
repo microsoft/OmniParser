@@ -6,3 +6,7 @@ weights/icon_detect_v1_5_2/
 .gradio
 __pycache__/
 debug.ipynb
+util/__pycache__/
+index.html?linkid=2289031
+wget-log
+weights/icon_caption_florence_v2/
