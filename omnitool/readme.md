@@ -33,8 +33,9 @@ There are three components:
 </table>
 
 ## Showcase Video
-| OmniParser V2   |    <video src="https://1drv.ms/v/c/650b027c18d5a573/EWXbVESKWo9Buu6OYCwg06wBeoM97C6EOTG6RjvWLEN1Qg?e=alnHGC" height="300" />    |
-| OmniTool   | <video src="https://1drv.ms/v/c/650b027c18d5a573/EehZ7RzY69ZHn-MeQHrnnR4BCj3by-cLLpUVlxMjF4O65Q?e=8LxMgX" height="300" />        |
+| OmniParser V2 | [Watch Video](https://1drv.ms/v/c/650b027c18d5a573/EWXbVESKWo9Buu6OYCwg06wBeoM97C6EOTG6RjvWLEN1Qg?e=alnHGC) |
+|--------------|------------------------------------------------------------------|
+| OmniTool    | [Watch Video](https://1drv.ms/v/c/650b027c18d5a573/EehZ7RzY69ZHn-MeQHrnnR4BCj3by-cLLpUVlxMjF4O65Q?e=8LxMgX) |
 
 
 ## Notes:
