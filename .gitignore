@@ -4,10 +4,9 @@ weights/icon_detect/
 weights/icon_detect_v1_5/
 weights/icon_detect_v1_5_2/
 .gradio
-*.swp
-.env
-.env.*
-venv/
-*.pem
 __pycache__/
 debug.ipynb
+util/__pycache__/
+index.html?linkid=2289031
+wget-log
+weights/icon_caption_florence_v2/

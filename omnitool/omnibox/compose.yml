@@ -1,0 +1,23 @@
+services:
+  windows:
+    image: windows-local
+    container_name: omni-windows
+    privileged: true
+    environment:
+      RAM_SIZE: "8G"
+      CPU_CORES: "4"
+      DISK_SIZE: "20G"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 8006:8006       # Web Viewer access
+      - 5000:5000       # Computer control server
+    volumes:
+      - ./vm/win11iso/custom.iso:/custom.iso
+      - ./vm/win11setup/firstboot:/oem
+      - ./vm/win11setup/setupscripts:/data
+      - ./vm/win11storage:/storage
+    
