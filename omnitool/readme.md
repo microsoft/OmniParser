@@ -65,7 +65,7 @@ There are three components:
    h. Ensure you have the V2 weights downloaded in weights folder (**ensure caption weights folder is called icon_caption_florence**). If not download them with:
    ```
    rm -rf weights/icon_detect weights/icon_caption weights/icon_caption_florence 
-   for f in icon_detect/{train_args.yaml,model.pt,model.yaml} icon_caption/{config.json,generation_config.json,model.safetensors}; do huggingface-cli download microsoft/OmniParser-v2.0 "$f" --local-dir weights; done
+   for folder in icon_caption icon_detect; do huggingface-cli download microsoft/OmniParser-v2.0 --local-dir weights --repo-type model --include "$folder/*"; done
    mv weights/icon_caption weights/icon_caption_florence
    ```
 
