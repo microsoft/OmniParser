@@ -28,3 +28,9 @@ for file in files:
 # Rename the directory "icon_caption" to "icon_caption_florence"
 icon_caption_path = os.path.join(weights_dir, "icon_caption")
 icon_caption_florence_path = os.path.join(weights_dir, "icon_caption_florence")
+
+if os.path.exists(icon_caption_path):
+    os.rename(icon_caption_path, icon_caption_florence_path)
+    print(f"Renamed {icon_caption_path} to {icon_caption_florence_path}")
+else:
+    print(f"Directory {icon_caption_path} not found!")
