@@ -6,6 +6,7 @@ import torch
 from PIL import Image
 import io
 import base64, os
+import tempfile
 from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 
 MARKDOWN = """
@@ -27,9 +28,12 @@ def create_process_fn(yolo_model, caption_model_processor, image_save_dir):
         use_paddleocr,
         imgsz
     ):
-        image_save_path = os.path.join(image_save_dir, 'saved_image_demo.png')
-        image_input.save(image_save_path)
-        image = Image.open(image_save_path)
+        # Convert image input to PIL Image if needed
+        if isinstance(image_input, np.ndarray):
+            image = Image.fromarray(image_input)
+        else:
+            image = image_input
+
         box_overlay_ratio = image.size[0] / 3200
         draw_bbox_config = {
             'text_scale': 0.8 * box_overlay_ratio,
@@ -38,11 +42,11 @@ def create_process_fn(yolo_model, caption_model_processor, image_save_dir):
             'thickness': max(int(3 * box_overlay_ratio), 1),
         }
 
-        ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img=False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
+        ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image, display_img=False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
         text, ocr_bbox = ocr_bbox_rslt
         
         dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(
-            image_save_path, 
+            image, 
             yolo_model, 
             BOX_TRESHOLD=box_threshold, 
             output_coord_in_ratio=True, 
@@ -54,10 +58,10 @@ def create_process_fn(yolo_model, caption_model_processor, image_save_dir):
             imgsz=imgsz,
         )
         
-        image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
+        output_image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
         print('finish processing')
         parsed_content_list = '\n'.join([f'icon {i}: ' + str(v) for i,v in enumerate(parsed_content_list)])
-        return image, parsed_content_list
+        return output_image, parsed_content_list
     
     return process
 
