@@ -35,9 +35,9 @@ def create_process_fn(yolo_model, caption_model_processor):
             elif isinstance(image_input, dict) and "image" in image_input:
                 # Handle image data from Gradio's image component
                 image_data = image_input["image"]
-                if isinstance(image_data, str) and image_data.startswith('data:image'):
+                if isinstance(image_data, str) and image_data.startswith("data:image"):
                     # Handle base64 image string
-                    image_data = image_data.split(',')[1]
+                    image_data = image_data.split(",")[1]
                     image = Image.open(io.BytesIO(base64.b64decode(image_data)))
                 elif isinstance(image_data, np.ndarray):
                     image = Image.fromarray(image_data)
@@ -69,17 +69,19 @@ def create_process_fn(yolo_model, caption_model_processor):
             )
             text, ocr_bbox = ocr_bbox_rslt
 
-            dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(
-                image,
-                yolo_model,
-                BOX_TRESHOLD=box_threshold,
-                output_coord_in_ratio=True,
-                ocr_bbox=ocr_bbox,
-                draw_bbox_config=draw_bbox_config,
-                caption_model_processor=caption_model_processor,
-                ocr_text=text,
-                iou_threshold=iou_threshold,
-                imgsz=imgsz,
+            dino_labled_img, label_coordinates, parsed_content_list = (
+                get_som_labeled_img(
+                    image,
+                    yolo_model,
+                    BOX_TRESHOLD=box_threshold,
+                    output_coord_in_ratio=True,
+                    ocr_bbox=ocr_bbox,
+                    draw_bbox_config=draw_bbox_config,
+                    caption_model_processor=caption_model_processor,
+                    ocr_text=text,
+                    iou_threshold=iou_threshold,
+                    imgsz=imgsz,
+                )
             )
 
             output_image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
@@ -94,9 +96,7 @@ def create_process_fn(yolo_model, caption_model_processor):
     return process
 
 
-def create_gradio_demo(
-    yolo_model=None, caption_model_processor=None
-):
+def create_gradio_demo(yolo_model=None, caption_model_processor=None):
     # Initialize models if not provided
     if yolo_model is None:
         yolo_model = get_yolo_model(model_path="weights/icon_detect/model.pt")

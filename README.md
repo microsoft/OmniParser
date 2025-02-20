@@ -4,13 +4,27 @@ This repository is a fork of [Microsoft's OmniParser](https://github.com/microso
 
 ## What's Different in this Fork?
 
-This fork adds Modal deployment support, allowing you to run OmniParser in Modal's cloud infrastructure with GPU acceleration. The main additions are:
+This fork adapts the original OmniParser's Gradio demo for Modal deployment with several key changes:
 
-- Modal-specific deployment configuration
-- Pre-configured GPU environment setup
-- Streamlined model weight handling
-- Automatic dependency management
-- Support for remote image uploads (base64 and file uploads)
+### Image Handling Improvements
+- Enhanced image input processing in [`gradio_demo.py`](gradio_demo.py) to handle both base64-encoded images and direct file uploads
+- Added robust type checking and conversion for various image input formats (numpy arrays, PIL Images, base64 strings)
+- Improved error handling for image processing failures
+
+### Modal-Specific Changes
+- New [`modal_app.py`](modal_app.py) that configures the Modal deployment environment:
+  - Sets up a Debian-based container with required system libraries
+  - Installs all Python dependencies via pip
+  - Copies model weights and utility files to the container
+  - Configures GPU acceleration using H100 instances
+  - Handles web endpoint configuration and threading
+  - Includes inactivity monitor that closes app after 1 minute without requests
+
+### Architecture Changes
+- Split the original monolithic Gradio demo into:
+  - Core demo logic in [`gradio_demo.py`](gradio_demo.py) that can run locally or in Modal
+  - Modal-specific configuration and deployment code in [`modal_app.py`](modal_app.py)
+- Added proper model initialization and resource management for Modal's serverless environment
 
 ## Running on Modal
 
@@ -33,15 +47,6 @@ This will:
 - Download and configure the necessary model weights
 - Launch a Gradio interface accessible via a public URL
 - Provide GPU acceleration using an A100 instance
-
-## Environment & Dependencies
-
-The Modal configuration automatically handles all dependencies, including:
-
-- Python packages (torch, gradio, etc.)
-- System dependencies
-- Model weights
-- GPU configuration
 
 ## License
 
