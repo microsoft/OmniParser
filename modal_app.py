@@ -86,8 +86,7 @@ def run_app():
     # Create Gradio interface with Modal-specific settings
     demo = create_gradio_demo(
         yolo_model=yolo_model,
-        caption_model_processor=caption_model_processor,
-        image_save_dir="/tmp"  # Use Modal's temp directory
+        caption_model_processor=caption_model_processor
     )
 
     # Launch the app with Modal's web endpoint configuration
