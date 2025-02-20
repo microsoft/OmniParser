@@ -1,6 +1,9 @@
 import modal
 from pathlib import Path
 import sys
+import time
+import threading
+from typing import Optional
 
 # Add the repository root to Python path for imports
 repo_root = Path(__file__).parent
@@ -71,11 +74,19 @@ image = (
     .copy_local_file("gradio_demo.py", "/root/gradio_demo.py")
 )
 
-@stub.function(image=image, gpu="H100", timeout=3600)  # 1 hour timeout
-def run_app():
-    """Run the Gradio app in Modal with GPU acceleration"""
-    import threading
-    import time
+@stub.function(
+    image=image,
+    gpu="H100",
+    timeout=21600, # 6 hours
+    memory=32768,  # 32GB RAM to match H100's capabilities
+    container_idle_timeout=60  # Shutdown container after 60 seconds of inactivity
+)
+def run_app() -> None:
+    """Run the Gradio app in Modal with GPU acceleration."""
+    # Initialize models with optimized settings
+    import torch
+    torch.backends.cuda.matmul.allow_tf32 = True  # Enable TF32 for faster matrix operations
+    torch.backends.cudnn.benchmark = True  # Enable cudnn autotuner
     
     # Initialize models
     yolo_model = get_yolo_model(model_path="/root/weights/icon_detect/model.pt")
@@ -90,47 +101,22 @@ def run_app():
         caption_model_processor=caption_model_processor
     )
 
-    class InactivityMonitor:
-        def __init__(self, demo, timeout=60):
-            self.demo = demo
-            self.timeout = timeout
-            self.last_request_time = time.time()
-            self.lock = threading.Lock()
-            self._start_monitor()
-            
-        def update(self):
-            with self.lock:
-                self.last_request_time = time.time()
-                
-        def _monitor(self):
-            while True:
-                time.sleep(10)
-                with self.lock:
-                    if time.time() - self.last_request_time > self.timeout:
-                        print("No requests in 1 minute, stopping the app.")
-                        self.demo.close()
-                        sys.exit()  # Exit the process
-                        
-        def _start_monitor(self):
-            thread = threading.Thread(target=self._monitor, daemon=True)
-            thread.start()
-
-    # Create inactivity monitor
-    monitor = InactivityMonitor(demo)
-
-    # Launch app with optimized settings
-    demo.queue(max_size=20).launch(
+    # Launch app with H100-optimized settings
+    demo.queue(
+        max_size=None,
+        status_update_rate=0.25,
+        default_concurrency_limit=8  # Increased for H100's higher throughput
+    ).launch(
         server_name="0.0.0.0",
         server_port=7860,
         share=True,
-        max_threads=16,
+        max_threads=64,  # Increased for better H100 utilization
         show_error=True,
-        root_path="/omniparser"
+        root_path="/omniparser",
+        ssl_verify=False,
     )
 
-    # Update activity timestamp
-    monitor.update()
-
 @stub.local_entrypoint()
-def main():
+def main() -> None:
+    """Main entrypoint for the Modal app."""
     run_app.remote()
