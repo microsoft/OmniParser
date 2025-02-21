@@ -1,57 +1,101 @@
-# OmniParserV2 Modal
+# OmniParserV2 Modal Cluster
 
-This repository is a fork of [Microsoft's OmniParser](https://github.com/microsoft/OmniParser) that adds support for running OmniParser on [Modal Labs](https://modal.com/). For full details about OmniParser itself, please refer to the [original repository](https://github.com/microsoft/OmniParser).
+[![License: AGPL](https://img.shields.io/badge/License-AGPL-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## What's Different in this Fork?
+OmniParserV2 Modal Cluster is a scalable, production-ready fork of [Microsoft's OmniParser](https://github.com/microsoft/OmniParser) that is optimized for cloud deployments using [Modal Labs](https://modal.com/). This project is designed for horizontal scaling, enabling multiple parallel instances to handle concurrent requests efficiently and process large volumes of data quickly.
 
-This fork adapts the original OmniParser's Gradio demo for Modal deployment with several key changes:
+## Key Features
 
-### Image Handling Improvements
-- Enhanced image input processing in [`gradio_demo.py`](gradio_demo.py) to handle both base64-encoded images and direct file uploads
-- Added robust type checking and conversion for various image input formats (numpy arrays, PIL Images, base64 strings)
-- Improved error handling for image processing failures
+- **Horizontal Scaling:** Deploy multiple instances to handle concurrent requests with dedicated GPU acceleration.
+- **Cloud-Native Optimization:** Leverage Modal Labs' infrastructure to build efficient, scalable, and cost-effective cloud applications.
+- **Enhanced Image Processing:** Supports base64-encoded images and direct file uploads for versatile image input handling.
+- **Production-Ready:** Incorporates robust error handling and optimal resource management to ensure reliability.
 
-### Modal-Specific Changes
-- New [`modal_app.py`](modal_app.py) that configures the Modal deployment environment:
-  - Sets up a Debian-based container with required system libraries
-  - Installs all Python dependencies via pip
-  - Copies model weights and utility files to the container
-  - Configures GPU acceleration using H100 instances
-  - Handles web endpoint configuration and threading
+## Architecture
 
-### Architecture Changes
-- Split the original monolithic Gradio demo into:
-  - Core demo logic in [`gradio_demo.py`](gradio_demo.py) that can run locally or in Modal
-  - Modal-specific configuration and deployment code in [`modal_app.py`](modal_app.py)
-- Added proper model initialization and resource management for Modal's serverless environment
+The project consists of several core components:
 
-## Running on Modal
+- **[deploy_multiple.py](deploy_multiple.py):** Orchestrates the deployment of multiple OmniParser instances in parallel.
+- **[modal_app.py](modal_app.py):** Configures the deployment environment and GPU acceleration using Modal Labs.
+- **[gradio_demo.py](gradio_demo.py):** Provides an interactive demo interface with advanced image processing capabilities.
 
-1. First, make sure you have Modal installed and configured:
+Each instance operates independently, ensuring isolation and dedicated GPU resources, which results in improved stability and performance in a cloud-serverless environment.
 
+## Quick Start
+
+1. **Install Dependencies:**
+   ```bash
+   pip install modal
+   ```
+
+2. **Set Up Modal Authentication:**
+   ```bash
+   modal token new
+   ```
+
+3. **Deploy Instances:**
+   Replace `<number_of_instances>` with the desired number of instances (up to 8 for Modal's free tier):
+   ```bash
+   python deploy_multiple.py <number_of_instances>
+   ```
+
+   Example output:
+   ```
+   2025-02-21 08:46:18,876 - INFO - Starting deployment of 8 instances (max parallel: 3)...
+   ...
+   Deployment Summary:
+   ==================
+   Total instances: 8
+   Successful: 8
+   Failed: 0
+   Average deploy time: 12.47s
+   ...
+   ```
+
+## Configuration
+
+Before deployment, configure the following environment variables as per your requirements:
+
+| Variable                      | Description                                          | Default         |
+| ----------------------------- | ---------------------------------------------------- | --------------- |
+| `MODAL_APP_NAME`              | Base name for the Modal application                  | "omniparser-v2" |
+| `MODAL_GPU_CONFIG`            | GPU type for instances                               | "L4"          |
+| `MODAL_CONTAINER_TIMEOUT`     | Container idle timeout (in seconds)                  | 120             |
+| `MODAL_MAX_CONCURRENT_INPUTS` | Maximum number of queued inputs                      | 50              |
+| `MODAL_CONCURRENCY_LIMIT`     | Maximum concurrent requests per instance             | 1               |
+| `GRADIO_PORT`                 | Port number for the Gradio interface                 | 7860            |
+
+Example configuration:
 ```bash
-pip install modal
-modal token new
+export MODAL_APP_NAME="omniparser"
+export MODAL_GPU_CONFIG="T4"
+export MODAL_CONTAINER_TIMEOUT=300
+export MODAL_MAX_CONCURRENT_INPUTS=100
+export MODAL_CONCURRENCY_LIMIT=1
+export GRADIO_PORT=8000
+
+python deploy_multiple.py 8
 ```
 
-2. Run the application:
+## Performance Considerations
 
-```bash
-modal run modal_app.py
-```
+- Modal's free tier supports a maximum of 8 concurrent web endpoints. For increased capacity, consider upgrading your Modal plan.
+- Optimize performance by scaling horizontally—deploy additional instances rather than increasing concurrent requests to a single instance.
+- GPU memory usage will scale with the number of instances and the size of the processed images.
 
-This will:
+## Known Limitations
 
-- Set up a Modal environment with all required dependencies
-- Download and configure the necessary model weights
-- Launch a Gradio interface accessible via a public URL
-- Provide GPU acceleration using an A100 instance
+- Retain `MODAL_CONCURRENCY_LIMIT=1` as the underlying model is not thread-safe.
+- Each instance handles only one request at a time; concurrent request handling is achieved through multiple instance deployments.
+- Cold starts may occur if a container exceeds the specified idle timeout.
 
 ## License
+This project is dual-licensed under the same licenses as the original:
+- **Icon Detection Model:** [AGPL License](https://www.gnu.org/licenses/agpl-3.0)
+- **Icon Caption Models (BLIP2 & Florence):** [MIT License](https://opensource.org/licenses/MIT)
 
-This fork maintains the same licensing as the original OmniParser:
+## Acknowledgments
 
-- Icon detection model: AGPL license
-- Icon caption models (BLIP2 & Florence): MIT license
-
-For full license details, see the original repository's LICENSE files.
+- The original OmniParser team at Microsoft for the base project.
+- Modal Labs for providing robust cloud deployment infrastructure.
