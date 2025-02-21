@@ -19,6 +19,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import easyocr
 from paddleocr import PaddleOCR
+import threading
+
 reader = easyocr.Reader(['en'])
 paddle_ocr = PaddleOCR(
     lang='en',  # other lang also available
@@ -29,6 +31,8 @@ paddle_ocr = PaddleOCR(
     use_dilation=True,  # improves accuracy
     det_db_score_mode='slow',  # improves accuracy
     rec_batch_num=1024)
+paddle_ocr_lock = threading.Lock()
+
 import time
 import base64
 
@@ -514,7 +518,8 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             text_threshold = 0.5
         else:
             text_threshold = easyocr_args['text_threshold']
-        result = paddle_ocr.ocr(image_np, cls=False)[0]
+        with paddle_ocr_lock:
+            result = paddle_ocr.ocr(image_np, cls=False)[0]
         coord = [item[0] for item in result if item[1][1] > text_threshold]
         text = [item[1][0] for item in result if item[1][1] > text_threshold]
     else:  # EasyOCR

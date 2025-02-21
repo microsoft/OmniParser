@@ -164,4 +164,4 @@ def create_gradio_demo(yolo_model=None, caption_model_processor=None):
 
 if __name__ == "__main__":
     demo = create_gradio_demo()
-    demo.launch(share=True, server_port=7861, server_name="0.0.0.0")
+    demo.launch(share=True, server_port=7861, server_name="0.0.0.0", concurrency_limit=10)
