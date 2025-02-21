@@ -40,6 +40,12 @@ Each instance operates independently, ensuring isolation and dedicated GPU resou
    python deploy_multiple.py <number_of_instances>
    ```
 
+4. **Stop All Deployed Instances:**
+   After you are done with your deployments and no longer need the instances running, you can stop all deployed instances using the following command:
+   ```bash
+   modal app list --json | jq -r '.[] | select(.State=="deployed") | .["App ID"]' | xargs -n1 modal app stop
+   ```
+
 ## Configuration
 
 Before deployment, configure the following environment variables as per your requirements:
