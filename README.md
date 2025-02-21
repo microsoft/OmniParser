@@ -16,8 +16,8 @@ OmniParserV2 Modal Cluster is a scalable, production-ready fork of [Microsoft's 
 
 The project consists of several core components:
 
-- **[deploy_multiple.py](deploy_multiple.py):** Orchestrates the deployment of multiple OmniParser instances in parallel.
 - **[modal_app.py](modal_app.py):** Configures the deployment environment and GPU acceleration using Modal Labs.
+- **[deploy_multiple.py](deploy_multiple.py):** Orchestrates the deployment of multiple OmniParser Modalinstances in parallel.
 - **[gradio_demo.py](gradio_demo.py):** Provides an interactive demo interface with advanced image processing capabilities.
 
 Each instance operates independently, ensuring isolation and dedicated GPU resources, which results in improved stability and performance in a cloud-serverless environment.
@@ -38,19 +38,6 @@ Each instance operates independently, ensuring isolation and dedicated GPU resou
    Replace `<number_of_instances>` with the desired number of instances (up to 8 for Modal's free tier):
    ```bash
    python deploy_multiple.py <number_of_instances>
-   ```
-
-   Example output:
-   ```
-   2025-02-21 08:46:18,876 - INFO - Starting deployment of 8 instances (max parallel: 3)...
-   ...
-   Deployment Summary:
-   ==================
-   Total instances: 8
-   Successful: 8
-   Failed: 0
-   Average deploy time: 12.47s
-   ...
    ```
 
 ## Configuration
@@ -83,6 +70,7 @@ python deploy_multiple.py 8
 - Modal's free tier supports a maximum of 8 concurrent web endpoints. For increased capacity, consider upgrading your Modal plan.
 - Optimize performance by scaling horizontally—deploy additional instances rather than increasing concurrent requests to a single instance.
 - GPU memory usage will scale with the number of instances and the size of the processed images.
+- For optimal results, use a pool of clients that intelligently balances load across instances to minimize pending requests on each instance, rather than a simple round robin approach.
 
 ## Known Limitations
 
