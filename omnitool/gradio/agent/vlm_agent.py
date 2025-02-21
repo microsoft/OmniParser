@@ -144,7 +144,7 @@ class VLMAgent:
             print(f"Total token so far: {self.total_token_usage}. Total cost so far: $USD{self.total_cost:.5f}")
         
         vlm_response_json = extract_data(vlm_response, "json")
-        vlm_response_json = json.loads(vlm_response_json)
+        vlm_response_json = json.loads(vlm_response_json, strict=False)
 
         img_to_show_base64 = parsed_screen["som_image_base64"]
         if "Box ID" in vlm_response_json:
