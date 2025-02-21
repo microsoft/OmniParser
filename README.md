@@ -18,7 +18,6 @@ This fork adapts the original OmniParser's Gradio demo for Modal deployment with
   - Copies model weights and utility files to the container
   - Configures GPU acceleration using H100 instances
   - Handles web endpoint configuration and threading
-  - Includes inactivity monitor that closes app after 1 minute without requests
 
 ### Architecture Changes
 - Split the original monolithic Gradio demo into:
