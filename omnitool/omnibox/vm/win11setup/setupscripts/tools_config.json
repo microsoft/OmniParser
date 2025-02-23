@@ -43,9 +43,7 @@
     },
     "GIMP": {
         "mirrors": [
-            "https://www-ftp.lip6.fr/pub/gimp/gimp/v2.10/windows/gimp-2.10.38-setup.exe",
-            "https://download.gimp.org/gimp/v2.10/windows/gimp-2.10.38-setup.exe",
-            "https://www-ftp.lip6.fr/pub/gimp/gimp/v2.10/windows/gimp-2.10.0-setup.exe"
+            "https://download.gimp.org/gimp/v2.10/windows/gimp-2.10.38-setup.exe"
         ],
         "alias": "gimp"
     },
