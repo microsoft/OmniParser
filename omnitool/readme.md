@@ -99,10 +99,10 @@ There are three components:
    d. Open the URL in the terminal output, set your API Key and start playing with the AI agent!
 
 ## Common setup errors
-## OmniBox install taking a while
+### OmniBox install taking a while
 If your internet speed is slow and you want a minimal VM with less preinstalled apps comment out lines 57 to 350 in this [file](https://github.com/microsoft/OmniParser/blob/master/omnitool/omnibox/vm/win11setup/setupscripts/setup.ps1) that defines all the apps to install when you first create the container + VM. Ensure that you follow factory reset instructions from the next section when creating your VM to wipe any previous omnibox setup.
 
-## Validation errors: Windows Host is not responding
+### Validation errors: Windows Host is not responding
 If you get this error in Gradio after clicking the submit button, this indicates that the server running in the VM that accepts commands from Gradio and then moves the mouse/ keyboard isn't available. You can verify this by running `curl http://localhost:5000/probe`. Ensure your `omnibox` is fully finished setting up (should no longer have a terminal window). Refer to the omnibox section for timing on that. If you have set up your omnibox, it may be a matter of waiting a little.
 
 If waiting 10 mins doesn't help. Try stopping (`./manage_vm.sh stop`) and starting (`./manage_vm.sh start`) your omnibox VM with the script commands.
@@ -114,7 +114,7 @@ Finally, if that still doesn't work and you want to fully reset your VM to facto
 2. delete the `vm/win11storage` folder
 3. run `./manage_vm.sh create`
 
-## libpaddle: The specified module could not be found
+### libpaddle: The specified module could not be found
 The OCR library used by OmniParser is Paddle that depends on C++ Redistributable on Windows. If you are on Windows ensure that you have installed it, then rerun installing the requirements.txt. More details [here](https://github.com/microsoft/OmniParser/issues/140#issuecomment-2670619168).
 
 ## Risks and Mitigations
