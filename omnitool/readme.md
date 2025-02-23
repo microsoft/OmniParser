@@ -114,6 +114,9 @@ Finally, if that still doesn't work and you want to fully reset your VM to facto
 2. delete the `vm/win11storage` folder
 3. run `./manage_vm.sh create`
 
+## libpaddle: The specified module could not be found
+The OCR library used by OmniParser is Paddle that depends on C++ Redistributable on Windows. If you are on Windows ensure that you have installed it, then rerun installing the requirements.txt. More details [here](https://github.com/microsoft/OmniParser/issues/140#issuecomment-2670619168).
+
 ## Risks and Mitigations
 To align with the Microsoft AI principles and Responsible AI practices, we conduct risk mitigation by training the icon caption model with Responsible AI data, which helps the model avoid inferring sensitive attributes (e.g.race, religion etc.) of the individuals which happen to be in icon images as much as possible. At the same time, we encourage user to apply OmniParser only for screenshot that does not contain harmful/violent content. For the OmniTool, we conduct threat model analysis using Microsoft Threat Modeling Tool. We advise human to stay in the loop in order to minimize risk.
 
