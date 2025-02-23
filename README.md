@@ -10,17 +10,27 @@ OmniParserV2 Modal Cluster is a scalable, production-ready fork of [Microsoft's 
 - **Horizontal Scaling:** Deploy multiple instances to handle concurrent requests with dedicated GPU acceleration.
 - **Cloud-Native Optimization:** Leverage Modal Labs' infrastructure to build efficient, scalable, and cost-effective cloud applications.
 - **Enhanced Image Processing:** Supports base64-encoded images and direct file uploads for versatile image input handling.
+- **Thread-Safe OCR:** Mitigates segfaults from concurrent requests by incorporating a thread lock in PaddleOCR calls.
 - **Production-Ready:** Incorporates robust error handling and optimal resource management to ensure reliability.
 
-## Architecture
-
-The project consists of several core components:
+## Changes from the original OmniParser
 
 - **[modal_app.py](modal_app.py):** Configures the deployment environment and GPU acceleration using Modal Labs.
-- **[deploy_multiple.py](deploy_multiple.py):** Orchestrates the deployment of multiple OmniParser Modalinstances in parallel.
-- **[gradio_demo.py](gradio_demo.py):** Provides an interactive demo interface with advanced image processing capabilities.
+- **[deploy_multiple.py](deploy_multiple.py):** Orchestrates the deployment of multiple OmniParser Modal instances in parallel.
+- **[gradio_demo.py](gradio_demo.py):** Provides an interactive demo interface with advanced image processing capabilities, including thread-safe OCR with thread locking.
+- **[util/utils.py](util/utils.py):** Implements utility functions with thread locking to ensure safe concurrent execution.
 
 Each instance operates independently, ensuring isolation and dedicated GPU resources, which results in improved stability and performance in a cloud-serverless environment.
+
+## Gradio and Modal Scaling Considerations
+
+While Modal offers [concurrent input handling](https://modal.com/docs/guide/concurrent-inputs) within a single container, this project intentionally uses multiple separate instances instead. This design choice is necessary because Gradio applications make several sequential requests (upload, queue status check, and process) that must be handled by the same instance to maintain session state. Modal's automatic container scaling could route these related requests to different containers, breaking the Gradio workflow.
+
+To ensure reliable operation:
+- Each Gradio interface runs as a separate Modal app instance
+- Requests from a single Gradio session are guaranteed to hit the same backend instance
+- Scaling is achieved by creating multiple complete instances rather than scaling containers within a single instance
+- This approach trades some resource efficiency for guaranteed session consistency
 
 ## Quick Start
 
@@ -52,21 +62,21 @@ Before deployment, configure the following environment variables as per your req
 
 | Variable                      | Description                                          | Default         |
 | ----------------------------- | ---------------------------------------------------- | --------------- |
-| `MODAL_APP_NAME`              | Base name for the Modal application                  | "omniparser-v2" |
-| `MODAL_GPU_CONFIG`            | GPU type for instances                               | "L4"          |
-| `MODAL_CONTAINER_TIMEOUT`     | Container idle timeout (in seconds)                  | 120             |
-| `MODAL_MAX_CONCURRENT_INPUTS` | Maximum number of queued inputs                      | 50              |
-| `MODAL_CONCURRENCY_LIMIT`     | Maximum concurrent requests per instance             | 1               |
+| `CONCURRENCY_LIMIT`           | Maximum concurrent requests per instance             | 50              |
 | `GRADIO_PORT`                 | Port number for the Gradio interface                 | 7860            |
+| `MODAL_APP_NAME`              | Base name for the Modal application                  | "omniparser"    |
+| `MODAL_CONCURRENT_CONTAINERS` | Maximum number of concurrent containers per instance | 1               |
+| `MODAL_CONTAINER_TIMEOUT`     | Container idle timeout (in seconds)                  | 120             |
+| `MODAL_GPU_CONFIG`            | GPU type for instances                               | "T4"            |
 
 Example configuration:
 ```bash
+export CONCURRENCY_LIMIT=50
+export GRADIO_PORT=7860
 export MODAL_APP_NAME="omniparser"
+export MODAL_CONCURRENT_CONTAINERS=1
+export MODAL_CONTAINER_TIMEOUT=120
 export MODAL_GPU_CONFIG="T4"
-export MODAL_CONTAINER_TIMEOUT=300
-export MODAL_MAX_CONCURRENT_INPUTS=100
-export MODAL_CONCURRENCY_LIMIT=1
-export GRADIO_PORT=8000
 
 python deploy_multiple.py 8
 ```
@@ -77,6 +87,7 @@ python deploy_multiple.py 8
 - Optimize performance by scaling horizontally—deploy additional instances rather than increasing concurrent requests to a single instance.
 - GPU memory usage will scale with the number of instances and the size of the processed images.
 - For optimal results, use a pool of clients that intelligently balances load across instances to minimize pending requests on each instance, rather than a simple round robin approach.
+
 
 ## Known Limitations
 

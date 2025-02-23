@@ -13,12 +13,12 @@ from util.utils import get_yolo_model, get_caption_model_processor
 from gradio_demo import create_gradio_demo
 
 # Environment configuration with defaults
-APP_NAME = os.environ.get("MODAL_APP_NAME", "omniparser-v2")
-GPU_CONFIG = os.environ.get("MODAL_GPU_CONFIG", "L4")
-CONTAINER_TIMEOUT = int(os.environ.get("MODAL_CONTAINER_TIMEOUT", "120"))
-MAX_CONCURRENT_INPUTS = int(os.environ.get("MODAL_MAX_CONCURRENT_INPUTS", "50"))
-CONCURRENCY_LIMIT = int(os.environ.get("MODAL_CONCURRENCY_LIMIT", "1")) # Multiple concurrent requests crash the model
+MODAL_APP_NAME = os.environ.get("MODAL_APP_NAME", "omniparser-v2")
+CONCURRENCY_LIMIT = int(os.environ.get("CONCURRENCY_LIMIT", "50"))
+MODAL_CONTAINER_TIMEOUT = int(os.environ.get("MODAL_CONTAINER_TIMEOUT", "120"))
+MODAL_GPU_CONFIG = os.environ.get("MODAL_GPU_CONFIG", "T4")
 GRADIO_PORT = int(os.environ.get("GRADIO_PORT", "7860"))
+MODAL_CONCURRENT_CONTAINERS = int(os.environ.get("MODAL_CONCURRENT_CONTAINERS", "1"))
 
 def create_image():
     """Create and configure the Modal image with all dependencies."""
@@ -71,13 +71,13 @@ def create_image():
     )
 
 # Create Modal app with the specified name
-app = modal.App(APP_NAME, image=create_image())
+app = modal.App(MODAL_APP_NAME, image=create_image())
 
 @app.cls(
-    gpu=GPU_CONFIG,
-    container_idle_timeout=CONTAINER_TIMEOUT,
-    allow_concurrent_inputs=MAX_CONCURRENT_INPUTS,
-    concurrency_limit=CONCURRENCY_LIMIT,
+    gpu=MODAL_GPU_CONFIG,
+    container_idle_timeout=MODAL_CONTAINER_TIMEOUT,
+    allow_concurrent_inputs=CONCURRENCY_LIMIT,
+    concurrency_limit=MODAL_CONCURRENT_CONTAINERS,
 )
 class GradioWebApp:
     """Gradio web application with configurable parameters."""

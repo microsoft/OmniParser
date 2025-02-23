@@ -1,12 +1,8 @@
-from typing import Optional
-
 import gradio as gr
 import numpy as np
-import torch
 from PIL import Image
 import io
-import base64, os
-import tempfile
+import base64
 from util.utils import (
     check_ocr_box,
     get_yolo_model,
@@ -164,4 +160,5 @@ def create_gradio_demo(yolo_model=None, caption_model_processor=None):
 
 if __name__ == "__main__":
     demo = create_gradio_demo()
-    demo.launch(share=True, server_port=7861, server_name="0.0.0.0", concurrency_limit=10)
+    demo.queue(default_concurrency_limit=4)
+    demo.launch(share=True, server_port=7861, server_name="0.0.0.0")
