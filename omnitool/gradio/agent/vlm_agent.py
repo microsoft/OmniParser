@@ -10,7 +10,7 @@ from anthropic import APIResponse
 from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
 
-from agent.llm_utils.oaiclient import run_oai_interleaved
+from agent.llm_utils.oaiclient import run_oai_interleaved, run_azure_oai_interleaved
 from agent.llm_utils.groqclient import run_groq_interleaved
 from agent.llm_utils.utils import is_image_path
 import time
@@ -38,6 +38,7 @@ class VLMAgent:
         max_tokens: int = 4096,
         only_n_most_recent_images: int | None = None,
         print_usage: bool = True,
+        azure_resource_name: str = None,  
     ):
         if model == "omniparser + gpt-4o":
             self.model = "gpt-4o-2024-11-20"
@@ -59,6 +60,7 @@ class VLMAgent:
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
         self.output_callback = output_callback
+        self.azure_resource_name = azure_resource_name
 
         self.print_usage = print_usage
         self.total_token_usage = 0
@@ -92,23 +94,41 @@ class VLMAgent:
 
         start = time.time()
         if "gpt" in self.model or "o1" in self.model or "o3-mini" in self.model:
-            vlm_response, token_usage = run_oai_interleaved(
-                messages=planner_messages,
-                system=system,
-                model_name=self.model,
-                api_key=self.api_key,
-                max_tokens=self.max_tokens,
-                provider_base_url="https://api.openai.com/v1",
-                temperature=0,
-            )
-            print(f"oai token usage: {token_usage}")
+            # Map model names to Azure deployment names
+            deployment_name = {
+                "gpt-4o-2024-11-20": "gpt-4o-0628",  # adjust to your actual deployment name
+                "o1": "o1",
+                "o3-mini": "o3-mini"
+            }.get(self.model)
+
+            if self.provider == "azure":
+                if not self.azure_resource_name:
+                    raise ValueError("azure_resource_name is required when using Azure OpenAI")
+                    
+                vlm_response, token_usage = run_azure_oai_interleaved(
+                    messages=planner_messages,
+                    system=system,
+                    deployment_name=deployment_name,
+                    api_key=self.api_key,
+                    resource_name=self.azure_resource_name,
+                    max_tokens=self.max_tokens,
+                )
+            else:  # openai
+                vlm_response, token_usage = run_oai_interleaved(
+                    messages=planner_messages,
+                    system=system,
+                    model_name=self.model,
+                    api_key=self.api_key,
+                    max_tokens=self.max_tokens,
+                )
+            print(f"{self.provider} oai token usage: {token_usage}")
             self.total_token_usage += token_usage
             if 'gpt' in self.model:
-                self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
+                self.total_cost += (token_usage * 2.5 / 1000000)
             elif 'o1' in self.model:
-                self.total_cost += (token_usage * 15 / 1000000)  # https://openai.com/api/pricing/
+                self.total_cost += (token_usage * 15 / 1000000)
             elif 'o3-mini' in self.model:
-                self.total_cost += (token_usage * 1.1 / 1000000)  # https://openai.com/api/pricing/
+                self.total_cost += (token_usage * 1.1 / 1000000)
         elif "r1" in self.model:
             vlm_response, token_usage = run_groq_interleaved(
                 messages=planner_messages,
