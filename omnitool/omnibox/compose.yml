@@ -4,7 +4,7 @@ services:
     container_name: omni-windows
     privileged: true
     environment:
-      RAM_SIZE: "8G"
+      RAM_SIZE: "4G"
       CPU_CORES: "4"
       DISK_SIZE: "20G"
     devices:
