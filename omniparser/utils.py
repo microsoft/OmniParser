@@ -1,24 +1,13 @@
-# from ultralytics import YOLO
-import os
 import io
 import base64
 import time
-from PIL import Image, ImageDraw, ImageFont
-import json
-import requests
-# utility function
-import os
-from openai import AzureOpenAI
-
-import json
-import sys
-import os
+from PIL import Image
 import cv2
 import numpy as np
-# %matplotlib inline
 from matplotlib import pyplot as plt
 import easyocr
 from paddleocr import PaddleOCR
+
 reader = easyocr.Reader(['en'])
 paddle_ocr = PaddleOCR(
     lang='en',  # other lang also available
@@ -32,12 +21,9 @@ paddle_ocr = PaddleOCR(
 import time
 import base64
 
-import os
-import ast
 import torch
 from typing import Tuple, List, Union
 from torchvision.ops import box_convert
-import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
