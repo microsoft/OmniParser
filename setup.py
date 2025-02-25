@@ -15,8 +15,8 @@ setup(
     long_description = long_description,
     long_description_content_type = "text/markdown",
     include_package_data = True,
-    packages = find_namespace_packages(where='util'),
-    package_dir = {"": "util"},
+    packages = find_namespace_packages(where='omniparser'),
+    package_dir = {"omniparser": "omniparser"},
     install_requires = [
         "opencv-python-headless",
         "gradio",
