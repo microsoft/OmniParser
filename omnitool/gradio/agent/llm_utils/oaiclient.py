@@ -137,8 +137,8 @@ def run_azure_oai_interleaved(
 
     try:
         text = response.json()['choices'][0]['message']['content']
-        token_usage = int(response.json()['usage']['total_tokens'])
-        return text, token_usage
+        token_usage = int(response.json().get('usage', {}).get('total_tokens', 0))
+        return text, token_usage        
     except Exception as e:
         print(f"Error in Azure OpenAI call: {e}. Response: {response.json()}")
-        return response.json()
+        return response.json()['choices'][0]['message']['content']
