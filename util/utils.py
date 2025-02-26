@@ -74,13 +74,20 @@ class PaddleOCRPool:
 # Get OCR pool size from environment variable or calculate based on resources
 def get_optimal_ocr_pool_size():
     """Calculate optimal OCR pool size based on available resources and environment settings"""
-    # First check if an environment variable is set
-    if 'PADDLE_OCR_POOL_SIZE' in os.environ:
-        try:
-            env_size = int(os.environ['PADDLE_OCR_POOL_SIZE'])
-            return max(1, env_size)  # Ensure at least 1
-        except (ValueError, TypeError):
-            pass  # Fall back to automatic calculation
+    # First check if PADDLE_OCR_POOL_SIZE is set in ENV_CONFIG
+    try:
+        # Try to import the ENV_CONFIG
+        from endpoint import ENV_CONFIG
+        if "PADDLE_OCR_POOL_SIZE" in ENV_CONFIG:
+            return max(1, ENV_CONFIG["PADDLE_OCR_POOL_SIZE"])
+    except (ImportError, KeyError):
+        # Fall back to direct environment variable check
+        if 'PADDLE_OCR_POOL_SIZE' in os.environ:
+            try:
+                env_size = int(os.environ['PADDLE_OCR_POOL_SIZE'])
+                return max(1, env_size)  # Ensure at least 1
+            except (ValueError, TypeError):
+                pass  # Fall back to automatic calculation
     
     # Default size based on CPU cores and available memory
     cpu_count = os.cpu_count() or 2

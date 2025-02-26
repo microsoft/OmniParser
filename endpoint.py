@@ -36,6 +36,7 @@ DEFAULT_GPU_CONFIG = "H100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
 DEFAULT_MAX_BATCH_SIZE = 100
+DEFAULT_PADDLE_OCR_POOL_SIZE = 25
 DEFAULT_LOG_LEVEL = "DEBUG"
 
 # Default request parameters
@@ -59,6 +60,9 @@ ENV_CONFIG = {
     ),
     "MAX_BATCH_SIZE": int(
         os.environ.get("MAX_BATCH_SIZE", str(DEFAULT_MAX_BATCH_SIZE))
+    ),
+    "PADDLE_OCR_POOL_SIZE": int(
+        os.environ.get("PADDLE_OCR_POOL_SIZE", str(DEFAULT_PADDLE_OCR_POOL_SIZE))
     ),
     "LOG_LEVEL": os.environ.get("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
 }
@@ -588,7 +592,7 @@ def process_batch_images(
     # Try to import the PaddleOCRPool size to align thread count with OCR resources
     try:
         from util.utils import paddle_ocr_pool
-        recommended_batch_size = min(paddle_ocr_pool.pool_size * 6, len(images))
+        recommended_batch_size = min(paddle_ocr_pool.pool_size * 9, len(images))
         
         # Cap at the configured max_batch_size
         effective_batch_size = min(recommended_batch_size, max_batch_size)
