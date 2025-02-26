@@ -7,27 +7,33 @@ import os
 import logging
 import sys
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Union, Any
 import traceback
 import json
 import uuid
-import torch
-from pydantic import BaseModel, Field, field_validator
+
+try:
+    from flask import Flask, request, jsonify
+except ImportError:
+    logging.warning(
+        "Flask not installed. Local server functionality will not be available."
+    )
+
+from pydantic import BaseModel, Field, validator
 
 from util.utils import (
     check_ocr_box,
     get_yolo_model,
     get_caption_model_processor,
-    get_som_labeled_img
+    get_som_labeled_img,
 )
 
 # Default configuration values
-DEFAULT_CONCURRENCY_LIMIT = 1
-DEFAULT_CONTAINER_TIMEOUT = 500
+DEFAULT_CONCURRENCY_LIMIT = 100
+DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "A100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_LOG_LEVEL = "INFO"
 
 # Default request parameters
 DEFAULT_BOX_THRESHOLD = 0.05
@@ -48,31 +54,17 @@ ENV_CONFIG = {
     "MAX_CONTAINERS": int(
         os.environ.get("MAX_CONTAINERS", str(DEFAULT_MAX_CONTAINERS))
     ),
-    "LOG_LEVEL": os.environ.get("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
 }
+
 
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
     logger = logging.getLogger("omniparser")
-
-    # Set log level based on configuration
-    log_level = ENV_CONFIG["LOG_LEVEL"]
-    logger.setLevel(
-        logging.DEBUG
-        if log_level == "DEBUG"
-        else logging.INFO if log_level == "INFO" else logging.CRITICAL
-    )
-
-    # Force removal of any existing handlers to prevent duplicates
+    logger.setLevel(logging.INFO)
     logger.handlers = []
 
-    # Create console handler and set level explicitly
     console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(
-        logging.DEBUG
-        if log_level == "DEBUG"
-        else logging.INFO if log_level == "INFO" else logging.CRITICAL
-    )
+    console_handler.setLevel(logging.INFO)
 
     # Simple formatter for regular logs
     formatter = logging.Formatter(
@@ -82,9 +74,6 @@ def setup_logging():
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     logger.propagate = False
-
-    # Set the root logger level to match our logger to prevent other libraries from overriding
-    logging.basicConfig(level=logger.level)
 
     return logger
 
@@ -154,12 +143,7 @@ class CanonicalLogger:
         logfmt_line = " ".join(
             [f"{k}={self._format_value(v)}" for k, v in log_data.items()]
         )
-
-        # Choose log type based on endpoint
-        if "batch" in self.endpoint.lower():
-            logger_instance.info(f"BATCH_LINE {logfmt_line}")
-        else:
-            logger_instance.info(f"IMAGE_LINE {logfmt_line}")
+        logger_instance.info(f"REQUEST_LOG {logfmt_line}")
 
     def log_error(self, logger_instance, error, traceback_str=None):
         """Log a failed request with error information."""
@@ -186,12 +170,7 @@ class CanonicalLogger:
         logfmt_line = " ".join(
             [f"{k}={self._format_value(v)}" for k, v in log_data.items()]
         )
-
-        # Choose log type based on endpoint, consistent with log_success
-        if "batch" in self.endpoint.lower():
-            logger_instance.error(f"BATCH_LINE {logfmt_line}")
-        else:
-            logger_instance.error(f"IMAGE_LINE {logfmt_line}")
+        logger_instance.error(f"CANONICAL_LOG {logfmt_line}")
 
         # Log traceback separately for debugging if provided
         if traceback_str and logger_instance.isEnabledFor(logging.DEBUG):
@@ -234,6 +213,7 @@ class ImageProcessor:
         Raises:
             ValueError: If the image format is unsupported
         """
+
         try:
             if isinstance(image_input, np.ndarray):
                 return Image.fromarray(image_input)
@@ -255,6 +235,7 @@ class ImageProcessor:
 
             raise ValueError(f"Unsupported image input format: {type(image_input)}")
         except Exception as e:
+
             raise ValueError(f"Image conversion error: {str(e)}") from e
 
     @staticmethod
@@ -288,8 +269,7 @@ class ProcessRequest(BaseModel):
     use_paddleocr: bool = Field(default=DEFAULT_USE_PADDLEOCR)
     imgsz: int = Field(default=DEFAULT_IMGSZ, ge=320, le=1920)
 
-    @field_validator("image_data")
-    @classmethod
+    @validator("image_data")
     def validate_image_data(cls, v):
         if not v.startswith("data:image"):
             raise ValueError("Image data must begin with 'data:image' prefix")
@@ -297,12 +277,7 @@ class ProcessRequest(BaseModel):
 
 
 class BatchProcessRequest(BaseModel):
-    """Request model for processing multiple images in a batch.
-
-    Images are processed in parallel using a thread pool, with the maximum number
-    of concurrent threads controlled by the MAX_BATCH_SIZE environment variable.
-    Results are returned in the same order as the input images.
-    """
+    """Request model for processing multiple images in a batch."""
 
     images: List[str] = Field(
         ...,
@@ -313,8 +288,7 @@ class BatchProcessRequest(BaseModel):
     use_paddleocr: bool = Field(default=DEFAULT_USE_PADDLEOCR)
     imgsz: int = Field(default=DEFAULT_IMGSZ, ge=320, le=1920)
 
-    @field_validator("images")
-    @classmethod
+    @validator("images")
     def validate_images(cls, v):
         if not v:
             raise ValueError("At least one image must be provided")
@@ -348,6 +322,8 @@ class OmniParser:
     def init_models(self):
         """Initialize models for both Modal and local environments."""
         try:
+            import torch
+
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.benchmark = True
 
@@ -484,164 +460,6 @@ class OmniParser:
             # Reset utils logging suppression
             os.environ.pop("OMNIPARSER_SUPPRESS_UTILS_LOGS", None)
 
-def process_batch_images(
-    request_id: str,
-    omniparser: OmniParser,
-    images: List[str],
-    process_params: Dict[str, Any],
-    collect_metrics: bool = True,
-    collect_detailed_metrics: bool = False,
-) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """
-    Process multiple images sequentially.
-
-    Args:
-        request_id: Unique identifier for this batch request
-        omniparser: OmniParser instance to use for processing
-        images: List of image data strings
-        process_params: Parameters for image processing (box_threshold, iou_threshold, etc.)
-        collect_metrics: Whether to collect performance metrics
-        collect_detailed_metrics: Whether to collect detailed performance metrics
-
-    Returns:
-        Tuple containing:
-        - List of results for each image
-        - Dictionary of performance metrics
-    """
-    # Log batch processing start
-    logger.debug(f"[{request_id}] Starting sequential processing of {len(images)} images")
-    
-    batch_canonical_log = CanonicalLogger(
-        request_id=request_id,
-        endpoint="process_batched",
-        request_params={
-            "batch_size": len(images),
-            **process_params,
-        },
-    )
-
-    # Track performance metrics if enabled
-    start_time = time.time()
-    per_image_times = {}
-
-    # Collect initial metrics only once at the beginning if needed
-    initial_metrics = {}
-    if collect_metrics and collect_detailed_metrics:
-        batch_canonical_log.start_step("resource_monitoring")
-        batch_canonical_log.end_step()
-
-    try:
-        batch_canonical_log.start_step("batch_processing")
-        # Initialize results array
-        results = []
-        
-        # Process images sequentially
-        for idx, image_data in enumerate(images):
-            image_start_time = time.time()
-            
-            try:
-                logger.debug(f"[{request_id}] Processing image {idx}")
-                
-                # Process the image
-                result = omniparser.process_image(
-                    image_data=image_data,
-                    box_threshold=process_params.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                    iou_threshold=process_params.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                    use_paddleocr=process_params.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                    imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
-                )
-
-                # Record processing time if needed
-                if collect_metrics:
-                    image_time = time.time() - image_start_time
-                    per_image_times[idx] = image_time
-                    logger.debug(f"[{request_id}] Completed image {idx} in {image_time:.3f}s")
-                
-                results.append(result)
-            except Exception as exc:
-                logger.error(f"[{request_id}] Image {idx} processing failed: {exc}")
-                results.append({
-                    "processed_image": "",
-                    "parsed_content": "",
-                    "error": f"Processing failed: {str(exc)}",
-                })
-            
-            # Occasional cleanup if using GPU
-            if torch.cuda.is_available() and idx % 5 == 0:
-                torch.cuda.empty_cache()
-                
-        batch_canonical_log.end_step()
-
-        # Generate performance metrics
-        performance_metrics = {}
-
-        if collect_metrics:
-            # Only collect detailed metrics if specifically requested
-            if collect_detailed_metrics:
-                batch_canonical_log.start_step("final_resource_monitoring")
-                batch_canonical_log.end_step()
-            
-            # Calculate timing statistics
-            total_time = time.time() - start_time
-            
-            # Extract basic metrics
-            successful_images = len([r for r in results if not r.get("error", "")])
-            failed_images = len([r for r in results if r.get("error", "")])
-            
-            # Basic performance metrics
-            performance_metrics = {
-                "batch_size": len(images),
-                "total_time_seconds": f"{total_time:.3f}",
-                "successful_images": successful_images,
-                "failed_images": failed_images,
-                "images_per_second": f"{len(images) / total_time:.2f}",
-            }
-            
-            # Add more detailed metrics only if requested
-            if collect_detailed_metrics and per_image_times:
-                avg_time = sum(per_image_times.values()) / len(per_image_times)
-                max_time = max(per_image_times.values()) if per_image_times else 0
-                min_time = min(per_image_times.values()) if per_image_times else 0
-                
-                detailed_metrics = {
-                    "avg_image_time_seconds": f"{avg_time:.3f}",
-                    "min_image_time_seconds": f"{min_time:.3f}",
-                    "max_image_time_seconds": f"{max_time:.3f}",
-                }
-                
-                # Add detailed metrics to performance metrics
-                performance_metrics.update(detailed_metrics)
-            
-            # Log summary metrics
-            batch_canonical_log.log_success(logger, performance_metrics)
-        else:
-            # If metrics collection is disabled, just log basic success
-            batch_canonical_log.log_success(
-                logger,
-                {
-                    "successful_images": len([r for r in results if not r.get("error", "")]),
-                    "failed_images": len([r for r in results if r.get("error", "")]),
-                    "total_time_seconds": f"{time.time() - start_time:.3f}",
-                },
-            )
-
-        # Perform a cleanup at the end of batch processing if using GPU
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            
-        return results, performance_metrics
-
-    except Exception as e:
-        # Stop timing current step if there is one
-        if batch_canonical_log.current_step:
-            batch_canonical_log.end_step()
-
-        # Log error with canonical log line
-        batch_canonical_log.log_error(logger, e, traceback.format_exc())
-
-        # Rethrow the exception
-        raise
-
 
 def create_modal_image():
     """Create and configure the Modal image with all dependencies."""
@@ -660,8 +478,8 @@ def create_modal_image():
             "ultralytics==8.3.70",
             "opencv-python",
             "opencv-python-headless",
-            "paddlepaddle==2.6.2",
-            "paddleocr==2.9.1",
+            "paddlepaddle",
+            "paddleocr",
             "gradio",
             "streamlit>=1.38.0",
             "screeninfo",
@@ -681,7 +499,8 @@ def create_modal_image():
             "ruff==0.6.7",
             "pre-commit==3.8.0",
             "pytest==8.3.3",
-            "pytest-asyncio==0.23.6"
+            "pytest-asyncio==0.23.6",
+            "flask",
         )
         .copy_local_file(
             "weights/icon_detect/model.pt", "/root/weights/icon_detect/model.pt"
@@ -716,6 +535,8 @@ class ModalContainer:
 
     def _configure_torch(self):
         """Configure PyTorch performance settings"""
+        import torch
+
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
 
@@ -737,40 +558,57 @@ class ModalContainer:
     @modal.web_endpoint(method="POST")
     def process_batched(self, req: BatchProcessRequest) -> List[Dict[str, Any]]:
         """Process multiple images in a single request"""
-        request_id = f"batch_{str(uuid.uuid4())[:8]}"
-
-        logger.debug(
-            f"[{request_id}] Starting batch processing with {len(req.images)} images"
+        batch_canonical_log = CanonicalLogger(
+            request_id=f"batch_{str(uuid.uuid4())[:8]}",
+            endpoint="process_batched",
+            request_params={
+                "batch_size": len(req.images),
+                "box_threshold": req.box_threshold,
+                "iou_threshold": req.iou_threshold,
+                "use_paddleocr": req.use_paddleocr,
+                "imgsz": req.imgsz,
+            },
         )
 
-        log_level = ENV_CONFIG["LOG_LEVEL"]
-        collect_metrics = log_level != "OFF"
-        collect_detailed_metrics = log_level == "DEBUG"
+        try:
+            batch_canonical_log.start_step("batch_processing")
+            results = []
 
-        process_params = {
-            "box_threshold": req.box_threshold,
-            "iou_threshold": req.iou_threshold,
-            "use_paddleocr": req.use_paddleocr,
-            "imgsz": req.imgsz,
-        }
+            for idx, image_data in enumerate(req.images):
+                batch_canonical_log.start_step(f"image_{idx}")
+                result = self.omniparser.process_image(
+                    image_data=image_data,
+                    box_threshold=req.box_threshold,
+                    iou_threshold=req.iou_threshold,
+                    use_paddleocr=req.use_paddleocr,
+                    imgsz=req.imgsz,
+                )
+                results.append(result)
+                batch_canonical_log.end_step()
 
-        results, _ = process_batch_images(
-            request_id=request_id,
-            omniparser=self.omniparser,
-            images=req.images,
-            process_params=process_params,
-            collect_metrics=collect_metrics,
-            collect_detailed_metrics=collect_detailed_metrics,
-        )
+            batch_canonical_log.end_step()
 
-        # Check if any image processing resulted in an error
-        any_errors = any(result.get("error") for result in results)
-        if any_errors:
-            logger.error(f"[{request_id}] Batch processing failed: Some images could not be processed")
-            error_messages = [r["error"] for r in results if r.get("error")]
-            raise RuntimeError(f"Batch processing failed: {'; '.join(error_messages)}")
+            # Log success with canonical log line
+            batch_canonical_log.log_success(
+                logger,
+                {
+                    "successful_images": len(results),
+                    "failed_images": len(
+                        [r for r in results if "error" in r and r["error"]]
+                    ),
+                },
+            )
 
-        return results
+            return results
+        except Exception as e:
+            # Stop timing current step if there is one
+            if batch_canonical_log.current_step:
+                batch_canonical_log.end_step()
+
+            # Log error with canonical log line
+            batch_canonical_log.log_error(logger, e, traceback.format_exc())
+
+            return [{"error": str(e), "processed_image": "", "parsed_content": ""}]
 
 
 class FlaskOmniParserServer:
@@ -779,27 +617,31 @@ class FlaskOmniParserServer:
     def __init__(self):
         """Initialize the Flask server with OmniParser instance"""
         try:
-            from flask import Flask, request, jsonify
-            self.Flask = Flask
-            self.request = request
-            self.jsonify = jsonify
+            from flask import Flask
 
             self.omniparser = OmniParser()
             self.web_app = Flask(__name__)
             self._setup_routes()
             logger.info("Flask server initialized successfully")
-        except Exception as e:
+        except ImportError as e:
             logger.error(f"Failed to initialize Flask server: {str(e)}")
             raise RuntimeError(
-                "Flask initialization failed. See error log for details."
+                "Flask is required for local server. Please install Flask."
             ) from e
 
     def _setup_routes(self):
         """Set up Flask routes for the API endpoints"""
+        from flask import request, jsonify
+
+        @self.web_app.route("/health", methods=["GET"])
+        def health_check():
+            """Health check endpoint to verify server is running"""
+            return jsonify({"status": "healthy", "version": "1.0.0"})
+
         @self.web_app.route("/process", methods=["POST"])
         def process():
             """Process a single image"""
-            data = self.request.get_json()
+            data = request.get_json()
             canonical_log = CanonicalLogger(
                 request_id=f"flask_{str(uuid.uuid4())[:8]}",
                 endpoint="/process",
@@ -826,11 +668,12 @@ class FlaskOmniParserServer:
                 canonical_log.log_success(
                     logger,
                     {
-                        "client_ip": self.request.remote_addr,
+                        "http_status": 200,
+                        "client_ip": request.remote_addr,
                     },
                 )
 
-                return self.jsonify(result)
+                return jsonify(result)
             except Exception as e:
                 # Stop timing current step if there is one
                 if canonical_log.current_step:
@@ -844,70 +687,73 @@ class FlaskOmniParserServer:
                     "processed_image": "",
                     "parsed_content": "",
                 }
-                return self.jsonify(error_response), 500
+                return jsonify(error_response), 500
 
         @self.web_app.route("/process_batched", methods=["POST"])
         def process_batched():
             """Process multiple images in a single request"""
-            data = self.request.get_json()
-            request_id = f"flask_batch_{str(uuid.uuid4())[:8]}"
-
-            logger.debug(
-                f"[{request_id}] Starting batch processing with {len(data['images'])} images"
+            data = request.get_json()
+            batch_canonical_log = CanonicalLogger(
+                request_id=f"flask_batch_{str(uuid.uuid4())[:8]}",
+                endpoint="/process_batched",
+                request_params={
+                    "batch_size": len(data["images"]),
+                    "box_threshold": data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
+                    "iou_threshold": data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
+                    "use_paddleocr": data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
+                    "imgsz": data.get("imgsz", DEFAULT_IMGSZ),
+                },
             )
 
-            log_level = ENV_CONFIG["LOG_LEVEL"]
-            collect_metrics = log_level != "OFF"
-            collect_detailed_metrics = log_level == "DEBUG"
+            try:
+                batch_canonical_log.start_step("batch_processing")
+                results = []
 
-            process_params = {
-                "box_threshold": data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                "iou_threshold": data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                "use_paddleocr": data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                "imgsz": data.get("imgsz", DEFAULT_IMGSZ),
-            }
+                for idx, image_data in enumerate(data["images"]):
+                    batch_canonical_log.start_step(f"image_{idx}")
+                    result = self.omniparser.process_image(
+                        image_data,
+                        data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
+                        data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
+                        data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
+                        data.get("imgsz", DEFAULT_IMGSZ),
+                    )
+                    results.append(result)
+                    batch_canonical_log.end_step()
 
-            results, _ = process_batch_images(
-                request_id=request_id,
-                omniparser=self.omniparser,
-                images=data["images"],
-                process_params=process_params,
-                collect_metrics=collect_metrics,
-                collect_detailed_metrics=collect_detailed_metrics,
-            )
+                batch_canonical_log.end_step()
 
-            # Check if any image processing resulted in an error
-            any_errors = any(result.get("error") for result in results)
-            if any_errors:
-                logger.error(f"[{request_id}] Batch processing failed: Some images could not be processed")
-                return self.jsonify({
-                    "results": results,
-                    "batch_error": "One or more images failed to process"
-                }), 500
+                # Log success with canonical log line
+                batch_canonical_log.log_success(
+                    logger,
+                    {
+                        "http_status": 200,
+                        "client_ip": request.remote_addr,
+                        "successful_images": len(results),
+                        "failed_images": len(
+                            [r for r in results if "error" in r and r["error"]]
+                        ),
+                    },
+                )
 
-            return self.jsonify(results)
+                return jsonify(results)
+            except Exception as e:
+                # Stop timing current step if there is one
+                if batch_canonical_log.current_step:
+                    batch_canonical_log.end_step()
+
+                # Log error with canonical log line
+                batch_canonical_log.log_error(logger, e, traceback.format_exc())
+
+                error_response = [
+                    {"error": str(e), "processed_image": "", "parsed_content": ""}
+                ]
+                return jsonify(error_response), 500
 
     def run(self, host="0.0.0.0", port=None, debug=False):
         """Run the Flask server"""
         port = port or ENV_CONFIG["API_PORT"]
         logger.info(f"Starting Flask server on {host}:{port}")
-
-        # Disable Flask's default logging handler to prevent overriding our settings
-        import logging
-        from flask.logging import default_handler
-
-        self.web_app.logger.removeHandler(default_handler)
-
-        # Ensure Flask's logger uses the same level as our logger
-        self.web_app.logger.setLevel(logger.level)
-        for handler in logger.handlers:
-            self.web_app.logger.addHandler(handler)
-
-        # Disable Werkzeug's built-in logging if we're not in debug mode
-        if not debug:
-            log = logging.getLogger("werkzeug")
-            log.setLevel(logging.ERROR)
-
         self.web_app.run(host=host, port=port, debug=debug)
 
 
@@ -915,7 +761,7 @@ if __name__ == "__main__":
     logger.info("Starting OmniParser API locally with Flask...")
     try:
         server = FlaskOmniParserServer()
-        server.run()
+        server.run(debug=True)
     except Exception as e:
         logger.critical(f"Failed to start server: {str(e)}")
         sys.exit(1)

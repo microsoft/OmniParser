@@ -385,14 +385,12 @@ def predict_yolo(model, image, box_threshold, imgsz, scale_img, iou_threshold=0.
         conf=box_threshold,
         imgsz=imgsz,
         iou=iou_threshold, # default 0.7
-        verbose=False
         )
     else:
         result = model.predict(
         source=image,
         conf=box_threshold,
         iou=iou_threshold, # default 0.7
-        verbose=False
         )
     boxes = result[0].boxes.xyxy#.tolist() # in pixel space
     conf = result[0].boxes.conf
@@ -430,7 +428,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
         ocr_bbox = torch.tensor(ocr_bbox) / torch.Tensor([w, h, w, h])
         ocr_bbox=ocr_bbox.tolist()
     else:
-        # print('no ocr bbox!!!')
+        print('no ocr bbox!!!')
         ocr_bbox = None
 
     ocr_bbox_elem = [{'type': 'text', 'bbox':box, 'interactivity':False, 'content':txt, 'source': 'box_ocr_content_ocr'} for box, txt in zip(ocr_bbox, ocr_text) if int_box_area(box, w, h) > 0] 
@@ -442,7 +440,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     # get the index of the first 'content': None
     starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
-    # print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
+    print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
     # get parsed icon local semantics
     time1 = time.time()
@@ -465,7 +463,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
-    # print('time to get parsed content:', time.time()-time1)
+    print('time to get parsed content:', time.time()-time1)
 
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
