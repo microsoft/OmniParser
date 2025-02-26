@@ -14,8 +14,8 @@ dill
 accelerate
 timm
 einops==0.8.0
-paddlepaddle
-paddleocr
+paddlepaddle==2.6.2
+paddleocr==2.9.1
 ruff==0.6.7
 pre-commit==3.8.0
 pytest==8.3.3
@@ -32,5 +32,3 @@ dashscope
 groq
 modal
 flask
-gputil
-psutil

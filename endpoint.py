@@ -11,9 +11,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import traceback
 import json
 import uuid
-import psutil
 import torch
-import GPUtil  # type: ignore
 from pydantic import BaseModel, Field, field_validator
 
 from util.utils import (
@@ -25,12 +23,11 @@ from util.utils import (
 
 # Default configuration values
 DEFAULT_CONCURRENCY_LIMIT = 1
-DEFAULT_CONTAINER_TIMEOUT = 300
-DEFAULT_GPU_CONFIG = "H100"
+DEFAULT_CONTAINER_TIMEOUT = 500
+DEFAULT_GPU_CONFIG = "A100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_MAX_BATCH_SIZE = 16  # Reduced from 1000 to a more reasonable value for GPU workloads
-DEFAULT_LOG_LEVEL = "DEBUG"
+DEFAULT_LOG_LEVEL = "INFO"
 
 # Default request parameters
 DEFAULT_BOX_THRESHOLD = 0.05
@@ -50,9 +47,6 @@ ENV_CONFIG = {
     "API_PORT": int(os.environ.get("API_PORT", str(DEFAULT_API_PORT))),
     "MAX_CONTAINERS": int(
         os.environ.get("MAX_CONTAINERS", str(DEFAULT_MAX_CONTAINERS))
-    ),
-    "MAX_BATCH_SIZE": int(
-        os.environ.get("MAX_BATCH_SIZE", str(DEFAULT_MAX_BATCH_SIZE))
     ),
     "LOG_LEVEL": os.environ.get("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
 }
@@ -490,74 +484,11 @@ class OmniParser:
             # Reset utils logging suppression
             os.environ.pop("OMNIPARSER_SUPPRESS_UTILS_LOGS", None)
 
-
-# New utility classes to reduce code duplication
-
-
-def collect_resource_metrics(detailed=False) -> Dict[str, float]:
-    """
-    Collect system and GPU resource metrics.
-
-    Args:
-        detailed: Whether to collect detailed metrics (more expensive operations)
-
-    Returns:
-        Dict of resource metrics
-    """
-    # Basic metrics that are always collected when metrics are enabled
-    metrics = {
-        "cpu_percent": psutil.cpu_percent(),
-        "system_memory_percent": psutil.virtual_memory().percent,
-        "system_memory_mb": psutil.virtual_memory().used / (1024 * 1024),
-    }
-
-    # Add GPU metrics if available and detailed metrics are requested
-    if torch.cuda.is_available():
-        try:
-            # Force synchronization to get accurate metrics
-            torch.cuda.synchronize()
-            
-            # For H100s, we need to be more aggressive about GPU metrics collection
-            # Get GPU metrics using GPUtil - more expensive but provides utilization info
-            gpus = GPUtil.getGPUs()
-            if gpus:
-                gpu = gpus[0]  # Use the first GPU
-                metrics["gpu_memory_percent"] = gpu.memoryUtil * 100
-                metrics["gpu_memory_mb"] = gpu.memoryUsed
-                metrics["gpu_utilization"] = gpu.load * 100
-            else:
-                # Fallback to PyTorch for basic memory info
-                gpu_id = torch.cuda.current_device()
-                metrics["gpu_memory_mb"] = torch.cuda.memory_allocated(gpu_id) / (
-                    1024 * 1024
-                )
-                metrics["gpu_memory_percent"] = (
-                    metrics["gpu_memory_mb"]
-                    / (
-                        torch.cuda.get_device_properties(gpu_id).total_memory
-                        / (1024 * 1024)
-                    )
-                ) * 100
-                metrics["gpu_utilization"] = 0  # Not available through PyTorch alone
-        except Exception as e:
-            logger.warning(f"Failed to collect GPU metrics: {e}")
-            metrics["gpu_memory_mb"] = 0
-            metrics["gpu_memory_percent"] = 0
-            metrics["gpu_utilization"] = 0
-    else:
-        metrics["gpu_memory_mb"] = 0
-        metrics["gpu_memory_percent"] = 0
-        metrics["gpu_utilization"] = 0
-
-    return metrics
-
-
 def process_batch_images(
     request_id: str,
     omniparser: OmniParser,
     images: List[str],
     process_params: Dict[str, Any],
-    max_batch_size: int = DEFAULT_MAX_BATCH_SIZE,
     collect_metrics: bool = True,
     collect_detailed_metrics: bool = False,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -569,7 +500,6 @@ def process_batch_images(
         omniparser: OmniParser instance to use for processing
         images: List of image data strings
         process_params: Parameters for image processing (box_threshold, iou_threshold, etc.)
-        max_batch_size: Not used - kept for backward compatibility
         collect_metrics: Whether to collect performance metrics
         collect_detailed_metrics: Whether to collect detailed performance metrics
 
@@ -598,7 +528,6 @@ def process_batch_images(
     initial_metrics = {}
     if collect_metrics and collect_detailed_metrics:
         batch_canonical_log.start_step("resource_monitoring")
-        initial_metrics = collect_resource_metrics(detailed=False)  # Lightweight metrics only
         batch_canonical_log.end_step()
 
     try:
@@ -650,7 +579,6 @@ def process_batch_images(
             # Only collect detailed metrics if specifically requested
             if collect_detailed_metrics:
                 batch_canonical_log.start_step("final_resource_monitoring")
-                final_metrics = collect_resource_metrics(detailed=False)  # Lightweight metrics only
                 batch_canonical_log.end_step()
             
             # Calculate timing statistics
@@ -680,18 +608,6 @@ def process_batch_images(
                     "min_image_time_seconds": f"{min_time:.3f}",
                     "max_image_time_seconds": f"{max_time:.3f}",
                 }
-                
-                # Add resource metrics if we collected them
-                if initial_metrics and 'final_metrics' in locals():
-                    detailed_metrics.update({
-                        "system_memory_delta_mb": f"{final_metrics.get('system_memory_mb', 0) - initial_metrics.get('system_memory_mb', 0):.1f}",
-                    })
-                    
-                    # Add GPU metrics if available
-                    if torch.cuda.is_available():
-                        detailed_metrics.update({
-                            "gpu_memory_used_mb": f"{final_metrics.get('gpu_memory_mb', 0):.1f}", 
-                        })
                 
                 # Add detailed metrics to performance metrics
                 performance_metrics.update(detailed_metrics)
@@ -723,8 +639,8 @@ def process_batch_images(
         # Log error with canonical log line
         batch_canonical_log.log_error(logger, e, traceback.format_exc())
 
-        error_result = {"error": str(e), "processed_image": "", "parsed_content": ""}
-        return [error_result for _ in range(len(images))], {}
+        # Rethrow the exception
+        raise
 
 
 def create_modal_image():
@@ -744,8 +660,8 @@ def create_modal_image():
             "ultralytics==8.3.70",
             "opencv-python",
             "opencv-python-headless",
-            "paddlepaddle",
-            "paddleocr",
+            "paddlepaddle==2.6.2",
+            "paddleocr==2.9.1",
             "gradio",
             "streamlit>=1.38.0",
             "screeninfo",
@@ -765,10 +681,7 @@ def create_modal_image():
             "ruff==0.6.7",
             "pre-commit==3.8.0",
             "pytest==8.3.3",
-            "pytest-asyncio==0.23.6",
-            "flask",
-            "gputil",
-            "psutil",
+            "pytest-asyncio==0.23.6"
         )
         .copy_local_file(
             "weights/icon_detect/model.pt", "/root/weights/icon_detect/model.pt"
@@ -846,10 +759,16 @@ class ModalContainer:
             omniparser=self.omniparser,
             images=req.images,
             process_params=process_params,
-            max_batch_size=ENV_CONFIG["MAX_BATCH_SIZE"],
             collect_metrics=collect_metrics,
             collect_detailed_metrics=collect_detailed_metrics,
         )
+
+        # Check if any image processing resulted in an error
+        any_errors = any(result.get("error") for result in results)
+        if any_errors:
+            logger.error(f"[{request_id}] Batch processing failed: Some images could not be processed")
+            error_messages = [r["error"] for r in results if r.get("error")]
+            raise RuntimeError(f"Batch processing failed: {'; '.join(error_messages)}")
 
         return results
 
@@ -860,7 +779,10 @@ class FlaskOmniParserServer:
     def __init__(self):
         """Initialize the Flask server with OmniParser instance"""
         try:
-            from flask import Flask
+            from flask import Flask, request, jsonify
+            self.Flask = Flask
+            self.request = request
+            self.jsonify = jsonify
 
             self.omniparser = OmniParser()
             self.web_app = Flask(__name__)
@@ -874,12 +796,10 @@ class FlaskOmniParserServer:
 
     def _setup_routes(self):
         """Set up Flask routes for the API endpoints"""
-        from flask import request, jsonify
-
         @self.web_app.route("/process", methods=["POST"])
         def process():
             """Process a single image"""
-            data = request.get_json()
+            data = self.request.get_json()
             canonical_log = CanonicalLogger(
                 request_id=f"flask_{str(uuid.uuid4())[:8]}",
                 endpoint="/process",
@@ -906,11 +826,11 @@ class FlaskOmniParserServer:
                 canonical_log.log_success(
                     logger,
                     {
-                        "client_ip": request.remote_addr,
+                        "client_ip": self.request.remote_addr,
                     },
                 )
 
-                return jsonify(result)
+                return self.jsonify(result)
             except Exception as e:
                 # Stop timing current step if there is one
                 if canonical_log.current_step:
@@ -924,12 +844,12 @@ class FlaskOmniParserServer:
                     "processed_image": "",
                     "parsed_content": "",
                 }
-                return jsonify(error_response), 500
+                return self.jsonify(error_response), 500
 
         @self.web_app.route("/process_batched", methods=["POST"])
         def process_batched():
             """Process multiple images in a single request"""
-            data = request.get_json()
+            data = self.request.get_json()
             request_id = f"flask_batch_{str(uuid.uuid4())[:8]}"
 
             logger.debug(
@@ -952,12 +872,20 @@ class FlaskOmniParserServer:
                 omniparser=self.omniparser,
                 images=data["images"],
                 process_params=process_params,
-                max_batch_size=ENV_CONFIG["MAX_BATCH_SIZE"],
                 collect_metrics=collect_metrics,
                 collect_detailed_metrics=collect_detailed_metrics,
             )
 
-            return jsonify(results)
+            # Check if any image processing resulted in an error
+            any_errors = any(result.get("error") for result in results)
+            if any_errors:
+                logger.error(f"[{request_id}] Batch processing failed: Some images could not be processed")
+                return self.jsonify({
+                    "results": results,
+                    "batch_error": "One or more images failed to process"
+                }), 500
+
+            return self.jsonify(results)
 
     def run(self, host="0.0.0.0", port=None, debug=False):
         """Run the Flask server"""
