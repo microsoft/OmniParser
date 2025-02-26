@@ -35,7 +35,7 @@ DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "H100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_MAX_BATCH_SIZE = 30
+DEFAULT_MAX_BATCH_SIZE = 100
 DEFAULT_LOG_LEVEL = "DEBUG"
 
 # Default request parameters
@@ -518,8 +518,12 @@ def collect_resource_metrics(detailed=False) -> Dict[str, float]:
     }
 
     # Add GPU metrics if available and detailed metrics are requested
-    if detailed and torch.cuda.is_available():
+    if torch.cuda.is_available():
         try:
+            # Force synchronization to get accurate metrics
+            torch.cuda.synchronize()
+            
+            # For H100s, we need to be more aggressive about GPU metrics collection
             # Get GPU metrics using GPUtil - more expensive but provides utilization info
             gpus = GPUtil.getGPUs()
             if gpus:
@@ -546,16 +550,10 @@ def collect_resource_metrics(detailed=False) -> Dict[str, float]:
             metrics["gpu_memory_mb"] = 0
             metrics["gpu_memory_percent"] = 0
             metrics["gpu_utilization"] = 0
-    elif torch.cuda.is_available():
-        # For non-detailed mode, just get basic GPU memory info from torch
-        try:
-            gpu_id = torch.cuda.current_device()
-            metrics["gpu_memory_mb"] = torch.cuda.memory_allocated(gpu_id) / (
-                1024 * 1024
-            )
-        except Exception as e:
-            logger.warning(f"Failed to collect basic GPU metrics: {e}")
-            metrics["gpu_memory_mb"] = 0
+    else:
+        metrics["gpu_memory_mb"] = 0
+        metrics["gpu_memory_percent"] = 0
+        metrics["gpu_utilization"] = 0
 
     return metrics
 
@@ -590,9 +588,8 @@ def process_batch_images(
     # Try to import the PaddleOCRPool size to align thread count with OCR resources
     try:
         from util.utils import paddle_ocr_pool
-        # Use a thread count of 2-3x the OCR pool size for best efficiency
-        # Increased multiplier from 2 to 3 based on performance metrics
-        recommended_batch_size = min(paddle_ocr_pool.pool_size * 3, len(images))
+        recommended_batch_size = min(paddle_ocr_pool.pool_size * 6, len(images))
+        
         # Cap at the configured max_batch_size
         effective_batch_size = min(recommended_batch_size, max_batch_size)
         logger.debug(f"[{request_id}] Adjusting batch size to {effective_batch_size} (OCR pool size: {paddle_ocr_pool.pool_size}, images: {len(images)})")
@@ -659,19 +656,43 @@ def process_batch_images(
                     )
 
                 # Process the image
-                result = omniparser.process_image(
-                    image_data=image_data,
-                    box_threshold=process_params.get(
-                        "box_threshold", DEFAULT_BOX_THRESHOLD
-                    ),
-                    iou_threshold=process_params.get(
-                        "iou_threshold", DEFAULT_IOU_THRESHOLD
-                    ),
-                    use_paddleocr=process_params.get(
-                        "use_paddleocr", DEFAULT_USE_PADDLEOCR
-                    ),
-                    imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
-                )
+                # Setting CUDA thread priority higher to ensure GPU access isn't a bottleneck
+                if torch.cuda.is_available():
+                    torch.cuda.set_device(0)  # Ensure using first GPU
+                    # Force device synchronization before processing to avoid thread contention
+                    torch.cuda.synchronize()
+                    
+                    # Process the image with GPU acceleration
+                    result = omniparser.process_image(
+                        image_data=image_data,
+                        box_threshold=process_params.get(
+                            "box_threshold", DEFAULT_BOX_THRESHOLD
+                        ),
+                        iou_threshold=process_params.get(
+                            "iou_threshold", DEFAULT_IOU_THRESHOLD
+                        ),
+                        use_paddleocr=process_params.get(
+                            "use_paddleocr", DEFAULT_USE_PADDLEOCR
+                        ),
+                        imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
+                    )
+                    
+                    # Force synchronization after processing
+                    torch.cuda.synchronize()
+                else:
+                    result = omniparser.process_image(
+                        image_data=image_data,
+                        box_threshold=process_params.get(
+                            "box_threshold", DEFAULT_BOX_THRESHOLD
+                        ),
+                        iou_threshold=process_params.get(
+                            "iou_threshold", DEFAULT_IOU_THRESHOLD
+                        ),
+                        use_paddleocr=process_params.get(
+                            "use_paddleocr", DEFAULT_USE_PADDLEOCR
+                        ),
+                        imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
+                    )
 
                 # Collect post-processing GPU metrics if detailed metrics are enabled
                 if collect_detailed_metrics and torch.cuda.is_available():
@@ -705,17 +726,11 @@ def process_batch_images(
                 if collect_detailed_metrics and torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 
-                # Always perform garbage collection to reduce memory pressure
-                # This helps prevent thread contention by freeing resources more aggressively
+                # Reduce aggressive garbage collection - it's causing synchronization issues
                 if collect_metrics:
-                    # Explicitly trigger garbage collection in debug mode
-                    if collect_detailed_metrics:
-                        gc.collect()
-                    else:
-                        # Lighter GC for production but still perform some cleanup
-                        # This helps with thread synchronization by freeing resources
-                        if random.random() < 0.2:  # Only perform GC on ~20% of threads to avoid GC overhead
-                            gc.collect(generation=0)  # Only collect youngest generation
+                    # Only do GC on 10% of threads instead of 20% to reduce overhead
+                    if collect_detailed_metrics or (random.random() < 0.1):
+                        gc.collect(generation=0)  # Only collect youngest generation
 
                     # Decrement active thread count
                     with thread_counter_lock:
