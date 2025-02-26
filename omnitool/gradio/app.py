@@ -27,7 +27,7 @@ CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 
 INTRO_TEXT = '''
-OmniParser lets you turn any vision-langauge model into an AI agent. We currently support **OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet).**
+OmniParser lets you turn any vision-langauge model into an AI agent. We currently support **OpenAI (4o/o1/o3-mini) [Both Azure and OpenAI APIs], DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet).**
 
 Type a message and press submit to start OmniTool. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
@@ -59,7 +59,10 @@ def setup_state(state):
     if "anthropic_api_key" not in state:
         state["anthropic_api_key"] = os.getenv("ANTHROPIC_API_KEY", "")
     if "api_key" not in state:
-        state["api_key"] = ""
+        if state.get("provider") in ["openai", "azure"]:
+            state["api_key"] = os.getenv("OPENAI_API_KEY", "")
+        else:
+            state["api_key"] = ""
     if "auth_validated" not in state:
         state["auth_validated"] = False
     if "responses" not in state:
@@ -72,6 +75,8 @@ def setup_state(state):
         state['chatbot_messages'] = []
     if 'stop' not in state:
         state['stop'] = False
+    if "azure_resource_name" not in state:
+        state["azure_resource_name"] = ""
 
 async def main(state):
     """Render loop for Gradio"""
@@ -202,6 +207,9 @@ def valid_params(user_input, state):
     if not state["api_key"].strip():
         errors.append("LLM API Key is not set")
 
+    if state["provider"] == "azure" and not state.get("azure_resource_name", "").strip():
+        errors.append("Azure Resource Name is required when using Azure OpenAI")
+
     if not user_input:
         errors.append("no computer use request provided")
     
@@ -241,8 +249,9 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        max_tokens=16384,
-        omniparser_url=args.omniparser_server_url
+        max_tokens=4096,
+        omniparser_url=args.omniparser_server_url,
+        azure_resource_name=state.get("azure_resource_name") if state["provider"] == "azure" else None
     ):  
         if loop_msg is None or state.get("stop"):
             yield state['chatbot_messages']
@@ -331,6 +340,14 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
                     placeholder="Paste your API key here",
                     interactive=True,
                 )
+        with gr.Row():
+            azure_resource_name = gr.Textbox(
+                label="Azure Resource Name",
+                value="",
+                placeholder="Required for Azure OpenAI",
+                interactive=True,
+                visible=False  # Initially hidden
+            )
 
     with gr.Row():
         with gr.Column(scale=8):
@@ -357,7 +374,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         if model_selection == "claude-3-5-sonnet-20241022":
             provider_choices = [option.value for option in APIProvider if option.value != "openai"]
         elif model_selection in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini"]):
-            provider_choices = ["openai"]
+            provider_choices = ["openai", "azure"]
         elif model_selection == "omniparser + R1":
             provider_choices = ["groq"]
         elif model_selection == "omniparser + qwen2.5vl":
@@ -384,7 +401,12 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             value=state["api_key"]
         )
 
-        return provider_update, api_key_update
+        # Add Azure visibility update
+        azure_visible = default_provider_value == "azure"
+        azure_resource_update = gr.update(visible=azure_visible)
+    
+
+        return provider_update, api_key_update, azure_resource_update
 
     def update_only_n_images(only_n_images_value, state):
         state["only_n_most_recent_images"] = only_n_images_value
@@ -392,18 +414,33 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     def update_provider(provider_value, state):
         # Update state
         state["provider"] = provider_value
-        state["api_key"] = state.get(f"{provider_value}_api_key", "")
+        if provider_value in ["openai", "azure"]:
+            state["api_key"] = state.get("openai_api_key", "")
+        else:
+            state["api_key"] = state.get(f"{provider_value}_api_key", "")
         
+        # Update Azure resource name visibility
+        azure_visible = provider_value == "azure"
+        azure_resource_update = gr.update(visible=azure_visible)
+
         # Calls to update other components UI
         api_key_update = gr.update(
-            placeholder=f"{provider_value.title()} API Key",
+            placeholder="OpenAI API Key",  # Keep it as OpenAI API Key for both
             value=state["api_key"]
         )
-        return api_key_update
-                
+
+        return api_key_update, azure_resource_update
+    
+    def update_azure_resource(resource_name, state):
+        state["azure_resource_name"] = resource_name
+
     def update_api_key(api_key_value, state):
         state["api_key"] = api_key_value
-        state[f'{state["provider"]}_api_key'] = api_key_value
+        # Store in openai_api_key if provider is openai or azure
+        if state["provider"] in ["openai", "azure"]:
+            state["openai_api_key"] = api_key_value
+        else:
+            state[f'{state["provider"]}_api_key'] = api_key_value
 
     def clear_chat(state):
         # Reset message-related state
@@ -415,8 +452,9 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
 
     model.change(fn=update_model, inputs=[model, state], outputs=[provider, api_key])
     only_n_images.change(fn=update_only_n_images, inputs=[only_n_images, state], outputs=None)
-    provider.change(fn=update_provider, inputs=[provider, state], outputs=api_key)
+    provider.change(fn=update_provider, inputs=[provider, state], outputs=[api_key, azure_resource_name])
     api_key.change(fn=update_api_key, inputs=[api_key, state], outputs=None)
+    azure_resource_name.change(fn=update_azure_resource, inputs=[azure_resource_name, state], outputs=None)
     chatbot.clear(fn=clear_chat, inputs=[state], outputs=[chatbot])
 
     submit_button.click(process_input, [chat_input, state], chatbot)

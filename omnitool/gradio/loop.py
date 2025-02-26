@@ -27,6 +27,7 @@ class APIProvider(StrEnum):
     BEDROCK = "bedrock"
     VERTEX = "vertex"
     OPENAI = "openai"
+    AZURE = "azure"
 
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
@@ -34,6 +35,7 @@ PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
     APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
     APIProvider.OPENAI: "gpt-4o",
+    APIProvider.AZURE: "gpt-4o"
 }
 
 def sampling_loop_sync(
@@ -47,7 +49,8 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    omniparser_url: str
+    omniparser_url: str,
+    azure_resource_name: str = None
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
@@ -72,7 +75,8 @@ def sampling_loop_sync(
             api_response_callback=api_response_callback,
             output_callback=output_callback,
             max_tokens=max_tokens,
-            only_n_most_recent_images=only_n_most_recent_images
+            only_n_most_recent_images=only_n_most_recent_images,
+            azure_resource_name=azure_resource_name if provider == APIProvider.AZURE else None
         )
     else:
         raise ValueError(f"Model {model} not supported")
