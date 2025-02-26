@@ -7,17 +7,10 @@ import os
 import logging
 import sys
 import time
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 import traceback
 import json
 import uuid
-
-try:
-    from flask import Flask, request, jsonify
-except ImportError:
-    logging.warning(
-        "Flask not installed. Local server functionality will not be available."
-    )
 
 from pydantic import BaseModel, Field, validator
 
@@ -29,7 +22,7 @@ from util.utils import (
 )
 
 # Default configuration values
-DEFAULT_CONCURRENCY_LIMIT = 100
+DEFAULT_CONCURRENCY_LIMIT = 1
 DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "A100"
 DEFAULT_API_PORT = 7861
@@ -55,7 +48,6 @@ ENV_CONFIG = {
         os.environ.get("MAX_CONTAINERS", str(DEFAULT_MAX_CONTAINERS))
     ),
 }
-
 
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
@@ -536,7 +528,6 @@ class ModalContainer:
     def _configure_torch(self):
         """Configure PyTorch performance settings"""
         import torch
-
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
 
@@ -549,11 +540,6 @@ class ModalContainer:
             use_paddleocr=req.use_paddleocr,
             imgsz=req.imgsz,
         )
-
-    @modal.web_endpoint(method="POST")
-    def process(self, req: ProcessRequest) -> Dict[str, Any]:
-        """Process a single image"""
-        return self._process_request(req)
 
     @modal.web_endpoint(method="POST")
     def process_batched(self, req: BatchProcessRequest) -> List[Dict[str, Any]]:
@@ -583,6 +569,16 @@ class ModalContainer:
                     use_paddleocr=req.use_paddleocr,
                     imgsz=req.imgsz,
                 )
+                
+                # Check if the current image processing failed
+                if "error" in result and result["error"]:
+                    # If there's an error, log it and raise an exception to fail the entire batch
+                    error_msg = f"Batch processing failed at image {idx}: {result['error']}"
+                    batch_canonical_log.end_step()
+                    batch_canonical_log.end_step()  # End both image step and batch step
+                    batch_canonical_log.log_error(logger, error_msg)
+                    raise ValueError(error_msg)
+                    
                 results.append(result)
                 batch_canonical_log.end_step()
 
@@ -593,9 +589,7 @@ class ModalContainer:
                 logger,
                 {
                     "successful_images": len(results),
-                    "failed_images": len(
-                        [r for r in results if "error" in r and r["error"]]
-                    ),
+                    "failed_images": 0,  # All must be successful at this point
                 },
             )
 
@@ -633,62 +627,6 @@ class FlaskOmniParserServer:
         """Set up Flask routes for the API endpoints"""
         from flask import request, jsonify
 
-        @self.web_app.route("/health", methods=["GET"])
-        def health_check():
-            """Health check endpoint to verify server is running"""
-            return jsonify({"status": "healthy", "version": "1.0.0"})
-
-        @self.web_app.route("/process", methods=["POST"])
-        def process():
-            """Process a single image"""
-            data = request.get_json()
-            canonical_log = CanonicalLogger(
-                request_id=f"flask_{str(uuid.uuid4())[:8]}",
-                endpoint="/process",
-                request_params={
-                    "box_threshold": data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                    "iou_threshold": data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                    "use_paddleocr": data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                    "imgsz": data.get("imgsz", DEFAULT_IMGSZ),
-                },
-            )
-
-            try:
-                canonical_log.start_step("process_request")
-                result = self.omniparser.process_image(
-                    data["image_data"],
-                    data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                    data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                    data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                    data.get("imgsz", DEFAULT_IMGSZ),
-                )
-                canonical_log.end_step()
-
-                # Log success with canonical log line
-                canonical_log.log_success(
-                    logger,
-                    {
-                        "http_status": 200,
-                        "client_ip": request.remote_addr,
-                    },
-                )
-
-                return jsonify(result)
-            except Exception as e:
-                # Stop timing current step if there is one
-                if canonical_log.current_step:
-                    canonical_log.end_step()
-
-                # Log error with canonical log line
-                canonical_log.log_error(logger, e, traceback.format_exc())
-
-                error_response = {
-                    "error": str(e),
-                    "processed_image": "",
-                    "parsed_content": "",
-                }
-                return jsonify(error_response), 500
-
         @self.web_app.route("/process_batched", methods=["POST"])
         def process_batched():
             """Process multiple images in a single request"""
@@ -718,6 +656,16 @@ class FlaskOmniParserServer:
                         data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
                         data.get("imgsz", DEFAULT_IMGSZ),
                     )
+                    
+                    # Check if the current image processing failed
+                    if "error" in result and result["error"]:
+                        # If there's an error, log it and raise an exception to fail the entire batch
+                        error_msg = f"Batch processing failed at image {idx}: {result['error']}"
+                        batch_canonical_log.end_step()
+                        batch_canonical_log.end_step()  # End both image step and batch step
+                        batch_canonical_log.log_error(logger, error_msg)
+                        return jsonify({"error": error_msg, "processed_image": "", "parsed_content": ""}), 400
+                        
                     results.append(result)
                     batch_canonical_log.end_step()
 
@@ -730,9 +678,7 @@ class FlaskOmniParserServer:
                         "http_status": 200,
                         "client_ip": request.remote_addr,
                         "successful_images": len(results),
-                        "failed_images": len(
-                            [r for r in results if "error" in r and r["error"]]
-                        ),
+                        "failed_images": 0,  # All must be successful at this point
                     },
                 )
 
@@ -745,9 +691,7 @@ class FlaskOmniParserServer:
                 # Log error with canonical log line
                 batch_canonical_log.log_error(logger, e, traceback.format_exc())
 
-                error_response = [
-                    {"error": str(e), "processed_image": "", "parsed_content": ""}
-                ]
+                error_response = {"error": str(e), "processed_image": "", "parsed_content": ""}
                 return jsonify(error_response), 500
 
     def run(self, host="0.0.0.0", port=None, debug=False):
