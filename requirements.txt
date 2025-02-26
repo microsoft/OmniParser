@@ -32,3 +32,5 @@ dashscope
 groq
 modal
 flask
+gputil
+psutil

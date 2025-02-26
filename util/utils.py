@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 reader = easyocr.Reader(['en'])
 
 class PaddleOCRPool:
-    def __init__(self, pool_size=16):
+    def __init__(self, pool_size=4):
         self.pool_size = pool_size
         self.ocr_queue = Queue()
         self.executor = ThreadPoolExecutor(max_workers=pool_size)
@@ -63,27 +63,39 @@ class PaddleOCRPool:
             self.return_ocr(ocr)
             return result
         except Exception as e:
-            if not should_suppress_logs():
-                print(f"PaddleOCR error: {str(e)}")
+            print(f"PaddleOCR error: {str(e)}")
             self.return_ocr(ocr)
             return []
+
+    def process_batch(self, images, cls=False):
+        """Process a batch of images concurrently"""
+        futures = []
+        results = []
+        
+        # Submit all tasks to the executor
+        for img in images:
+            futures.append(self.executor.submit(self.process_image, img, cls))
+            
+        # Collect results as they complete
+        for future in futures:
+            results.append(future.result())
+            
+        return results
 
     def __del__(self):
         """Clean up resources"""
         self.executor.shutdown(wait=False)
 
-# Create global OCR pool with size based on CPU count
-paddle_ocr_pool = PaddleOCRPool(pool_size=min(os.cpu_count() or 1, 4))
+# Create global OCR pool with size based on GPU capability
+# For H100, we can utilize more workers
+paddle_ocr_pool = PaddleOCRPool(pool_size=min(os.cpu_count() or 1, 8))
 
 import time
 import base64
-
 import os
-import ast
 import torch
 from typing import Tuple, List, Union
 from torchvision.ops import box_convert
-import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
@@ -129,6 +141,8 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
         non_ocr_boxes = filtered_boxes[starting_idx:]
     else:
         non_ocr_boxes = filtered_boxes
+    
+    # Pre-process all images at once
     croped_pil_image = []
     for i, coord in enumerate(non_ocr_boxes):
         try:
@@ -140,6 +154,10 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
         except:
             continue
 
+    # If no valid boxes, return empty list
+    if not croped_pil_image:
+        return []
+
     model, processor = caption_model_processor['model'], caption_model_processor['processor']
     if not prompt:
         if 'florence' in model.config.name_or_path:
@@ -149,18 +167,37 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
     
     generated_texts = []
     device = model.device
+    
+    # Process in larger batches if on H100
+    if torch.cuda.get_device_properties(0).name.find("H100") >= 0:
+        batch_size = min(256, len(croped_pil_image))  # H100 can handle larger batches
+    
     for i in range(0, len(croped_pil_image), batch_size):
-        start = time.time()
         batch = croped_pil_image[i:i+batch_size]
-        t1 = time.time()
         if model.device.type == 'cuda':
-            inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt", do_resize=False).to(device=device, dtype=torch.float16)
+            # Use non_blocking for asynchronous data transfer
+            inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt", do_resize=False).to(device=device, dtype=torch.float16, non_blocking=True)
         else:
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device)
+        
         if 'florence' in model.config.name_or_path:
-            generated_ids = model.generate(input_ids=inputs["input_ids"],pixel_values=inputs["pixel_values"],max_new_tokens=20,num_beams=1, do_sample=False)
+            generated_ids = model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=20,
+                num_beams=1,
+                do_sample=False
+            )
         else:
-            generated_ids = model.generate(**inputs, max_length=100, num_beams=5, no_repeat_ngram_size=2, early_stopping=True, num_return_sequences=1) # temperature=0.01, do_sample=True,
+            generated_ids = model.generate(
+                **inputs, 
+                max_length=100, 
+                num_beams=5, 
+                no_repeat_ngram_size=2, 
+                early_stopping=True, 
+                num_return_sequences=1
+            )
+        
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)
         generated_text = [gen.strip() for gen in generated_text]
         generated_texts.extend(generated_text)
@@ -379,7 +416,7 @@ def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
 
 
 def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor, phrases: List[str], text_scale: float, 
-             text_padding=5, text_thickness=2, thickness=3) -> np.ndarray:
+             text_padding=5, text_thickness=2, thickness=3) -> Tuple[np.ndarray, dict]:
     """    
     This function annotates an image with bounding boxes and labels.
 
@@ -391,7 +428,7 @@ def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor
     text_scale (float): The scale of the text to be displayed. 0.8 for mobile/web, 0.3 for desktop # 0.4 for mind2web
 
     Returns:
-    np.ndarray: The annotated image.
+    Tuple[np.ndarray, dict]: The annotated image and label coordinates.
     """
     h, w, _ = image_source.shape
     boxes = boxes * torch.Tensor([w, h, w, h])
@@ -399,7 +436,7 @@ def annotate(image_source: np.ndarray, boxes: torch.Tensor, logits: torch.Tensor
     xywh = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xywh").numpy()
     detections = sv.Detections(xyxy=xyxy)
 
-    labels = [f"{phrase}" for phrase in range(boxes.shape[0])]
+    labels = [f"{phrase}" for phrase in phrases]
 
     box_annotator = BoxAnnotator(text_scale=text_scale, text_padding=text_padding,text_thickness=text_thickness,thickness=thickness) # 0.8 for mobile/web, 0.3 for desktop # 0.4 for mind2web
     annotated_frame = image_source.copy()
@@ -461,36 +498,42 @@ def int_box_area(box, w, h):
     area = (int_box[2] - int_box[0]) * (int_box[3] - int_box[1])
     return area
 
-def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_TRESHOLD=0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9,prompt=None, scale_img=False, imgsz=None, batch_size=128):
+def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_TRESHOLD=0.01, output_coord_in_ratio=False, ocr_bbox=None, text_scale=0.4, text_padding=5, draw_bbox_config=None, caption_model_processor=None, ocr_text=[], use_local_semantics=True, iou_threshold=0.9, prompt=None, scale_img=False, imgsz=None, batch_size=128):
     """Process either an image path or Image object
     
     Args:
         image_source: Either a file path (str) or PIL Image object
         ...
     """
+    # Convert to PIL Image if it's a path
     if isinstance(image_source, str):
         image_source = Image.open(image_source)
     image_source = image_source.convert("RGB") # for CLIP
     w, h = image_source.size
     if not imgsz:
         imgsz = (h, w)
-    # print('image size:', w, h)
+    
+    # Run YOLO detection
     xyxy, logits, phrases = predict_yolo(model=model, image=image_source, box_threshold=BOX_TRESHOLD, imgsz=imgsz, scale_img=scale_img, iou_threshold=0.1)
+    
+    # Convert to normalized coordinates
     xyxy = xyxy / torch.Tensor([w, h, w, h]).to(xyxy.device)
-    image_source = np.asarray(image_source)
+    
+    # Convert image for processing
+    image_source_np = np.asarray(image_source)
     phrases = [str(i) for i in range(len(phrases))]
 
-    # annotate the image with labels
+    # Process OCR bbox data
     if ocr_bbox:
         ocr_bbox = torch.tensor(ocr_bbox) / torch.Tensor([w, h, w, h])
         ocr_bbox = ocr_bbox.tolist()
     else:
-        ocr_bbox = []  # Use empty list instead of None
-        ocr_text = []  # Ensure ocr_text is also empty when no bbox
+        ocr_bbox = []
+        ocr_text = []
 
     # Create OCR elements list only if we have valid OCR results
     ocr_bbox_elem = []
-    if ocr_bbox and ocr_text:  # Only process if both lists have content
+    if ocr_bbox and ocr_text:
         ocr_bbox_elem = [
             {
                 'type': 'text',
@@ -503,7 +546,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
             if int_box_area(box, w, h) > 0
         ]
 
-    # Process YOLO detections
+    # Process YOLO detections in a more efficient way
     xyxy_elem = [
         {
             'type': 'icon',
@@ -527,42 +570,59 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     # Convert bboxes to tensor after sorting
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
 
-    # get parsed icon local semantics
-    time1 = time.time()
-    if use_local_semantics:
+    # Process content detection
+    if use_local_semantics and caption_model_processor and len(filtered_boxes) > 0:
         caption_model = caption_model_processor['model']
+        
+        # On H100, use larger batch sizes
+        if torch.cuda.is_available() and torch.cuda.get_device_properties(0).name.find("H100") >= 0:
+            batch_size = min(256, len(filtered_boxes) - (starting_idx or 0))
+        
+        # Process captions
         if 'phi3_v' in caption_model.config.model_type: 
-            parsed_content_icon = get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source, caption_model_processor)
+            parsed_content_icon = get_parsed_content_icon_phi3v(filtered_boxes, ocr_bbox, image_source_np, caption_model_processor)
         else:
-            parsed_content_icon = get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_model_processor, prompt=prompt,batch_size=batch_size)
+            parsed_content_icon = get_parsed_content_icon(filtered_boxes, starting_idx, image_source_np, caption_model_processor, prompt=prompt, batch_size=batch_size)
+        
+        # Format the OCR text
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         icon_start = len(ocr_text)
         parsed_content_icon_ls = []
-        # fill the filtered_boxes_elem None content with parsed_content_icon in order
+        
+        # Fill the filtered_boxes_elem None content with parsed_content_icon in order
         for i, box in enumerate(filtered_boxes_elem):
-            if box['content'] is None:
+            if box['content'] is None and parsed_content_icon:
                 box['content'] = parsed_content_icon.pop(0)
-        for i, txt in enumerate(parsed_content_icon):
-            parsed_content_icon_ls.append(f"Icon Box ID {str(i+icon_start)}: {txt}")
+                
+        # Create the formatted content list
+        for i, box in enumerate(filtered_boxes_elem):
+            if box['type'] == 'icon' and box['content']:
+                parsed_content_icon_ls.append(f"Icon Box ID {str(i)}: {box['content']}")
+                
         parsed_content_merged = ocr_text + parsed_content_icon_ls
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
 
+    # Convert to cxcywh format for annotation
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
-    phrases = [i for i in range(len(filtered_boxes))]
+    # Convert phrases to strings
+    phrases = [str(i) for i in range(len(filtered_boxes))]
     
-    # draw boxes
+    # Draw boxes
     if draw_bbox_config:
-        annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, **draw_bbox_config)
+        annotated_frame, label_coordinates = annotate(image_source=image_source_np, boxes=filtered_boxes, logits=logits, phrases=phrases, **draw_bbox_config)
     else:
-        annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, text_scale=text_scale, text_padding=text_padding)
+        annotated_frame, label_coordinates = annotate(image_source=image_source_np, boxes=filtered_boxes, logits=logits, phrases=phrases, text_scale=text_scale, text_padding=text_padding)
     
+    # Generate output image
     pil_img = Image.fromarray(annotated_frame)
     buffered = io.BytesIO()
     pil_img.save(buffered, format="PNG")
     encoded_image = base64.b64encode(buffered.getvalue()).decode('ascii')
+    
+    # Convert coordinates if needed
     if output_coord_in_ratio:
         label_coordinates = {k: [v[0]/w, v[1]/h, v[2]/w, v[3]/h] for k, v in label_coordinates.items()}
         assert w == annotated_frame.shape[1] and h == annotated_frame.shape[0]
@@ -631,3 +691,66 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
         elif output_bb_format == 'xyxy':
             bb = [get_xyxy(item) for item in coord]
     return (text, bb), goal_filtering
+
+def check_ocr_batch(images: List[Union[str, Image.Image]], output_bb_format='xywh', easyocr_args=None, use_paddleocr=True):
+    """Process a batch of images with OCR in parallel"""
+    # Convert all images to numpy arrays
+    image_nps = []
+    for img in images:
+        if isinstance(img, str):
+            img = Image.open(img)
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+        image_nps.append(np.array(img))
+    
+    if use_paddleocr:
+        if easyocr_args is None:
+            text_threshold = 0.5
+        else:
+            text_threshold = easyocr_args['text_threshold']
+        
+        # Process the batch of images
+        try:
+            results = paddle_ocr_pool.process_batch(image_nps, cls=False)
+            
+            # Process results for each image
+            all_results = []
+            for result in results:
+                # Filter results with confidence above threshold
+                valid_results = [(item[0], item[1]) for item in result if len(item) >= 2 and isinstance(item[1], tuple) and len(item[1]) >= 2 and item[1][1] > text_threshold]
+                coord = [item[0] for item in valid_results] if valid_results else []
+                text = [item[1][0] for item in valid_results] if valid_results else []
+                
+                if output_bb_format == 'xywh':
+                    bb = [get_xywh(item) for item in coord]
+                elif output_bb_format == 'xyxy':
+                    bb = [get_xyxy(item) for item in coord]
+                
+                all_results.append((text, bb))
+            
+            return all_results
+        except Exception as e:
+            print(f"Batch OCR processing error: {str(e)}")
+            # Return empty results for all images
+            return [([],[]) for _ in images]
+    else:
+        # Use EasyOCR - process sequentially as EasyOCR doesn't have built-in batch processing
+        all_results = []
+        for img_np in image_nps:
+            if easyocr_args is None:
+                easyocr_args = {}
+            try:
+                result = reader.readtext(img_np, **easyocr_args)
+                coord = [item[0] for item in result]
+                text = [item[1] for item in result]
+                
+                if output_bb_format == 'xywh':
+                    bb = [get_xywh(item) for item in coord]
+                elif output_bb_format == 'xyxy':
+                    bb = [get_xyxy(item) for item in coord]
+                    
+                all_results.append((text, bb))
+            except Exception as e:
+                all_results.append(([],[]))
+        
+        return all_results

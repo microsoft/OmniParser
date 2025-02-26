@@ -71,15 +71,19 @@ Before deployment, configure the following environment variables as per your req
 | ----------------------------- | ---------------------------------------------------- | --------------- |
 | `CONCURRENCY_LIMIT`           | Maximum concurrent requests per instance             | 50              |
 | `GRADIO_PORT`                 | Port number for the Gradio interface                 | 7860            |
+| `MAX_BATCH_THREADS`           | Maximum parallel threads for batch image processing  | 50              |
 | `MODAL_APP_NAME`              | Base name for the Modal application                  | "omniparser"    |
 | `MODAL_CONCURRENT_CONTAINERS` | Maximum number of concurrent containers per instance | 1               |
 | `MODAL_CONTAINER_TIMEOUT`     | Container idle timeout (in seconds)                  | 120             |
 | `MODAL_GPU_CONFIG`            | GPU type for instances                               | "T4"            |
+| `PERF_LOG_LEVEL`              | Performance logging verbosity (OFF/BASIC/DETAILED/DEBUG) | "BASIC"       |
 
 Example configuration:
 ```bash
 export CONCURRENCY_LIMIT=50
 export GRADIO_PORT=7860
+export MAX_BATCH_THREADS=50
+export PERF_LOG_LEVEL=BASIC
 export MODAL_APP_NAME="omniparser"
 export MODAL_CONCURRENT_CONTAINERS=1
 export MODAL_CONTAINER_TIMEOUT=120
@@ -92,9 +96,15 @@ python deploy_multiple.py 8
 
 - Modal's free tier supports a maximum of 8 concurrent web endpoints. For increased capacity, consider upgrading your Modal plan.
 - Optimize performance by scaling horizontally—deploy additional instances rather than increasing concurrent requests to a single instance.
+- Batch processing is now performed in parallel, with the degree of parallelism controlled by the `MAX_BATCH_THREADS` environment variable.
+- Tune `MAX_BATCH_THREADS` based on your GPU memory and capabilities—higher values increase throughput but also increase memory usage.
+- Performance logging can be configured with `PERF_LOG_LEVEL`:
+  - `OFF`: No performance metrics collected (maximizes performance)
+  - `BASIC`: Only essential metrics like batch processing time (minimal impact)
+  - `DETAILED`: Full resource tracking and analysis (moderate impact)
+  - `DEBUG`: Maximum verbosity with per-image logging (significant impact)
 - GPU memory usage will scale with the number of instances and the size of the processed images.
 - For optimal results, use a pool of clients that intelligently balances load across instances to minimize pending requests on each instance, rather than a simple round robin approach.
-
 
 ## Known Limitations
 

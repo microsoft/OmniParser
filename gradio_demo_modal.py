@@ -110,7 +110,6 @@ class GradioWebApp:
     @modal.asgi_app()
     def fastapi_app(self):
         """Create and configure the FastAPI application with Gradio interface."""
-        import gradio as gr
         from fastapi import FastAPI
         from gradio.routes import mount_gradio_app
 
