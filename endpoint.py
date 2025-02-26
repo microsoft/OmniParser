@@ -7,26 +7,20 @@ import os
 import logging
 import sys
 import time
-import signal
-from typing import Dict, List, Optional, Any, Callable, Tuple
+from typing import Dict, List, Optional, Any, Tuple
 import traceback
 import json
 import uuid
-import concurrent.futures
 import psutil
-import gc
-import threading
 import torch
 import GPUtil  # type: ignore
 from pydantic import BaseModel, Field, field_validator
-import random
 
 from util.utils import (
     check_ocr_box,
     get_yolo_model,
     get_caption_model_processor,
-    get_som_labeled_img,
-    paddle_ocr_pool,
+    get_som_labeled_img
 )
 
 # Default configuration values
@@ -35,8 +29,7 @@ DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "H100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_MAX_BATCH_SIZE = 200
-DEFAULT_PADDLE_OCR_POOL_SIZE = 40
+DEFAULT_MAX_BATCH_SIZE = 16  # Reduced from 1000 to a more reasonable value for GPU workloads
 DEFAULT_LOG_LEVEL = "DEBUG"
 
 # Default request parameters
@@ -569,14 +562,14 @@ def process_batch_images(
     collect_detailed_metrics: bool = False,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Process multiple images in parallel using a thread pool.
+    Process multiple images sequentially.
 
     Args:
         request_id: Unique identifier for this batch request
         omniparser: OmniParser instance to use for processing
         images: List of image data strings
         process_params: Parameters for image processing (box_threshold, iou_threshold, etc.)
-        max_batch_size: Maximum number of threads to use
+        max_batch_size: Not used - kept for backward compatibility
         collect_metrics: Whether to collect performance metrics
         collect_detailed_metrics: Whether to collect detailed performance metrics
 
@@ -585,20 +578,8 @@ def process_batch_images(
         - List of results for each image
         - Dictionary of performance metrics
     """
-    # Limit the batch size based on available resources to prevent thread contention
-    # Try to import the PaddleOCRPool size to align thread count with OCR resources
-    try:
-        from util.utils import paddle_ocr_pool
-        recommended_batch_size = min(paddle_ocr_pool.pool_size * 15, len(images))
-        
-        # Cap at the configured max_batch_size
-        effective_batch_size = min(recommended_batch_size, max_batch_size)
-        logger.debug(f"[{request_id}] Adjusting batch size to {effective_batch_size} (OCR pool size: {paddle_ocr_pool.pool_size}, images: {len(images)})")
-    except (ImportError, AttributeError):
-        # If we can't import paddle_ocr_pool, just use the configured max_batch_size
-        # But still respect the number of images
-        effective_batch_size = min(max_batch_size, len(images))
-        logger.debug(f"[{request_id}] Using configured batch size: {effective_batch_size}")
+    # Log batch processing start
+    logger.debug(f"[{request_id}] Starting sequential processing of {len(images)} images")
     
     batch_canonical_log = CanonicalLogger(
         request_id=request_id,
@@ -606,327 +587,132 @@ def process_batch_images(
         request_params={
             "batch_size": len(images),
             **process_params,
-            "max_threads": effective_batch_size,
         },
     )
 
     # Track performance metrics if enabled
     start_time = time.time()
     per_image_times = {}
-    active_threads = 0
-    max_active_threads = 0
 
-    # Initial resource usage metrics if enabled
+    # Collect initial metrics only once at the beginning if needed
     initial_metrics = {}
-    if collect_metrics:
+    if collect_metrics and collect_detailed_metrics:
         batch_canonical_log.start_step("resource_monitoring")
-        initial_metrics = collect_resource_metrics(detailed=collect_detailed_metrics)
+        initial_metrics = collect_resource_metrics(detailed=False)  # Lightweight metrics only
         batch_canonical_log.end_step()
 
     try:
         batch_canonical_log.start_step("batch_processing")
+        # Initialize results array
         results = []
-
-        # Create a semaphore to track active threads
-        thread_semaphore = threading.Semaphore(0)
-        thread_counter_lock = threading.Lock()
-
-        def process_with_metrics(idx, image_data):
-            nonlocal active_threads, max_active_threads
+        
+        # Process images sequentially
+        for idx, image_data in enumerate(images):
             image_start_time = time.time()
-
-            # Increment active thread count if metrics collection is enabled
-            if collect_metrics:
-                with thread_counter_lock:
-                    active_threads += 1
-                    max_active_threads = max(max_active_threads, active_threads)
-
+            
             try:
-                thread_id = threading.get_ident()
-                logger.debug(
-                    f"[{request_id}] Starting processing image {idx} in thread {thread_id}"
+                logger.debug(f"[{request_id}] Processing image {idx}")
+                
+                # Process the image
+                result = omniparser.process_image(
+                    image_data=image_data,
+                    box_threshold=process_params.get("box_threshold", DEFAULT_BOX_THRESHOLD),
+                    iou_threshold=process_params.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
+                    use_paddleocr=process_params.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
+                    imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
                 )
 
-                # Collect pre-processing GPU metrics for this thread if detailed metrics are enabled
-                pre_gpu_mem = 0
-                if collect_detailed_metrics and torch.cuda.is_available():
-                    gpu_id = torch.cuda.current_device()
-                    pre_gpu_mem = torch.cuda.memory_allocated(gpu_id) / (1024**2)  # MB
-                    logger.debug(
-                        f"[{request_id}] Image {idx} - Pre-process GPU memory: {pre_gpu_mem:.2f} MB"
-                    )
-
-                # Process the image
-                # Setting CUDA thread priority higher to ensure GPU access isn't a bottleneck
-                if torch.cuda.is_available():
-                    torch.cuda.set_device(0)  # Ensure using first GPU
-                    # Force device synchronization before processing to avoid thread contention
-                    torch.cuda.synchronize()
-                    
-                    # Process the image with GPU acceleration
-                    result = omniparser.process_image(
-                        image_data=image_data,
-                        box_threshold=process_params.get(
-                            "box_threshold", DEFAULT_BOX_THRESHOLD
-                        ),
-                        iou_threshold=process_params.get(
-                            "iou_threshold", DEFAULT_IOU_THRESHOLD
-                        ),
-                        use_paddleocr=process_params.get(
-                            "use_paddleocr", DEFAULT_USE_PADDLEOCR
-                        ),
-                        imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
-                    )
-                    
-                    # Force synchronization after processing
-                    torch.cuda.synchronize()
-                else:
-                    result = omniparser.process_image(
-                        image_data=image_data,
-                        box_threshold=process_params.get(
-                            "box_threshold", DEFAULT_BOX_THRESHOLD
-                        ),
-                        iou_threshold=process_params.get(
-                            "iou_threshold", DEFAULT_IOU_THRESHOLD
-                        ),
-                        use_paddleocr=process_params.get(
-                            "use_paddleocr", DEFAULT_USE_PADDLEOCR
-                        ),
-                        imgsz=process_params.get("imgsz", DEFAULT_IMGSZ),
-                    )
-
-                # Collect post-processing GPU metrics if detailed metrics are enabled
-                if collect_detailed_metrics and torch.cuda.is_available():
-                    gpu_id = torch.cuda.current_device()
-                    post_gpu_mem = torch.cuda.memory_allocated(gpu_id) / (1024**2)  # MB
-                    logger.debug(
-                        f"[{request_id}] Image {idx} - Post-process GPU memory: {post_gpu_mem:.2f} MB"
-                    )
-                    logger.debug(
-                        f"[{request_id}] Image {idx} - GPU memory delta: {post_gpu_mem - pre_gpu_mem:.2f} MB"
-                    )
-
-                # Record processing time if metrics collection is enabled
+                # Record processing time if needed
                 if collect_metrics:
                     image_time = time.time() - image_start_time
                     per_image_times[idx] = image_time
-                    logger.debug(
-                        f"[{request_id}] Finished processing image {idx} in {image_time:.3f}s"
-                    )
-
-                return result
+                    logger.debug(f"[{request_id}] Completed image {idx} in {image_time:.3f}s")
+                
+                results.append(result)
             except Exception as exc:
                 logger.error(f"[{request_id}] Image {idx} processing failed: {exc}")
-                return {
+                results.append({
                     "processed_image": "",
                     "parsed_content": "",
                     "error": f"Processing failed: {str(exc)}",
-                }
-            finally:
-                # Release resources explicitly if detailed metrics are enabled
-                if collect_detailed_metrics and torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                })
+            
+            # Occasional cleanup if using GPU
+            if torch.cuda.is_available() and idx % 5 == 0:
+                torch.cuda.empty_cache()
                 
-                # Reduce aggressive garbage collection - it's causing synchronization issues
-                if collect_metrics:
-                    # Only do GC on 10% of threads instead of 20% to reduce overhead
-                    if collect_detailed_metrics or (random.random() < 0.1):
-                        gc.collect(generation=0)  # Only collect youngest generation
-
-                    # Decrement active thread count
-                    with thread_counter_lock:
-                        active_threads -= 1
-
-                    # Signal thread completion
-                    thread_semaphore.release()
-
-        # Process images in parallel using ThreadPoolExecutor
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=effective_batch_size
-        ) as executor:            
-            # Create a list of future objects
-            future_to_idx = {
-                executor.submit(process_with_metrics, idx, image_data): idx
-                for idx, image_data in enumerate(images)
-            }
-
-            # Process results as they complete
-            for future in concurrent.futures.as_completed(future_to_idx):
-                idx = future_to_idx[future]
-                batch_canonical_log.start_step(f"image_{idx}")
-                try:
-                    logger.debug(f"[{request_id}] Processing result for image {idx}")
-                    result = future.result()
-                    # Ensure results are ordered by original index
-                    while len(results) <= idx:
-                        results.append(None)
-                    results[idx] = result
-                    logger.debug(f"[{request_id}] Completed processing for image {idx}")
-                except Exception as exc:
-                    logger.error(f"[{request_id}] Image {idx} processing failed: {exc}")
-                    # Add error entry for failed image
-                    while len(results) <= idx:
-                        results.append(None)
-                    results[idx] = {
-                        "processed_image": "",
-                        "parsed_content": "",
-                        "error": f"Processing failed: {str(exc)}",
-                    }
-                finally:
-                    batch_canonical_log.end_step()
-
-        # Fill any missing results (though this shouldn't happen)
-        results = [
-            (
-                r
-                if r is not None
-                else {
-                    "processed_image": "",
-                    "parsed_content": "",
-                    "error": "Processing failed: Unknown error",
-                }
-            )
-            for r in results
-        ]
-
         batch_canonical_log.end_step()
 
         # Generate performance metrics
         performance_metrics = {}
 
         if collect_metrics:
-            # Collect final resource metrics
-            batch_canonical_log.start_step("final_resource_monitoring")
-            final_metrics = collect_resource_metrics(detailed=collect_detailed_metrics)
-            batch_canonical_log.end_step()
-
-            # Calculate resource usage deltas
-            memory_delta_mb = final_metrics.get(
-                "system_memory_mb", 0
-            ) - initial_metrics.get("system_memory_mb", 0)
-            gpu_memory_delta_mb = final_metrics.get(
-                "gpu_memory_mb", 0
-            ) - initial_metrics.get("gpu_memory_mb", 0)
-
+            # Only collect detailed metrics if specifically requested
+            if collect_detailed_metrics:
+                batch_canonical_log.start_step("final_resource_monitoring")
+                final_metrics = collect_resource_metrics(detailed=False)  # Lightweight metrics only
+                batch_canonical_log.end_step()
+            
             # Calculate timing statistics
             total_time = time.time() - start_time
-
+            
+            # Extract basic metrics
+            successful_images = len([r for r in results if not r.get("error", "")])
+            failed_images = len([r for r in results if r.get("error", "")])
+            
             # Basic performance metrics
             performance_metrics = {
                 "batch_size": len(images),
                 "total_time_seconds": f"{total_time:.3f}",
-                "successful_images": len(
-                    [r for r in results if "error" not in r or not r["error"]]
-                ),
-                "failed_images": len(
-                    [r for r in results if "error" in r and r["error"]]
-                ),
+                "successful_images": successful_images,
+                "failed_images": failed_images,
+                "images_per_second": f"{len(images) / total_time:.2f}",
             }
-
-            # Add detailed performance metrics if enabled
-            if collect_detailed_metrics:
-                avg_time = (
-                    sum(per_image_times.values()) / len(per_image_times)
-                    if per_image_times
-                    else 0
-                )
+            
+            # Add more detailed metrics only if requested
+            if collect_detailed_metrics and per_image_times:
+                avg_time = sum(per_image_times.values()) / len(per_image_times)
                 max_time = max(per_image_times.values()) if per_image_times else 0
                 min_time = min(per_image_times.values()) if per_image_times else 0
-
-                # Compute actual throughput
-                throughput = len(images) / total_time
                 
-                # Performance analysis focused on GPU utilization
-                gpu_utilization = final_metrics.get("gpu_utilization", 0)
-                gpu_memory_percent = final_metrics.get("gpu_memory_percent", 0)
-                
-                # Calculate efficiency based on GPU utilization instead of thread throughput
-                gpu_efficiency = gpu_utilization  # Direct measure of GPU usage
-                
-                # Determine bottleneck with focus on GPU utilization
-                bottleneck = "Unknown"
-                if gpu_utilization < 30:
-                    if max_active_threads < effective_batch_size:
-                        bottleneck = "Insufficient Threads"
-                    elif final_metrics.get("system_memory_percent", 0) > 90:
-                        bottleneck = "System Memory"
-                    elif final_metrics.get("cpu_percent", 0) > 90:
-                        bottleneck = "CPU"
-                    else:
-                        bottleneck = "Thread Synchronization or I/O"
-                elif gpu_utilization < 70:
-                    if gpu_memory_percent > 90:
-                        bottleneck = "GPU Memory"
-                    else:
-                        bottleneck = "Mixed CPU/GPU Processing"
-                else:
-                    bottleneck = "GPU Compute"
-
-                # Suggestion for optimal thread count based on GPU utilization
-                suggested_threads = max_active_threads
-                
-                # If GPU is underutilized, recommend more threads to increase load
-                if gpu_utilization < 40 and max_active_threads <= effective_batch_size:
-                    # Recommend more threads when GPU is idle
-                    suggested_threads = min(100, int(effective_batch_size * 1.5))
-                # If GPU memory is nearly full but utilization is low
-                elif gpu_memory_percent > 85 and gpu_utilization < 70:
-                    # Reduce thread count to prevent OOM but maintain processing
-                    suggested_threads = max(1, int(max_active_threads * 0.8))
-                # If GPU is well utilized (70-95%)
-                elif 70 <= gpu_utilization <= 95:
-                    # Keep current thread count as it's working well
-                    suggested_threads = max_active_threads
-                # If GPU is maxed out (>95%)
-                elif gpu_utilization > 95:
-                    # Slight reduction to prevent throttling
-                    suggested_threads = max(1, int(max_active_threads * 0.9))
-
-                # Add the detailed metrics
                 detailed_metrics = {
-                    "max_threads_config": effective_batch_size,
-                    "max_active_threads": max_active_threads,
                     "avg_image_time_seconds": f"{avg_time:.3f}",
                     "min_image_time_seconds": f"{min_time:.3f}",
                     "max_image_time_seconds": f"{max_time:.3f}",
-                    "images_per_second": f"{throughput:.2f}",
-                    "gpu_efficiency_percent": f"{gpu_efficiency:.1f}",
-                    "system_memory_used_mb": f"{final_metrics.get('system_memory_mb', 0):.1f}",
-                    "system_memory_delta_mb": f"{memory_delta_mb:.1f}",
-                    "system_memory_percent": f"{final_metrics.get('system_memory_percent', 0):.1f}",
-                    "gpu_memory_used_mb": f"{final_metrics.get('gpu_memory_mb', 0):.1f}",
-                    "gpu_memory_delta_mb": f"{gpu_memory_delta_mb:.1f}",
-                    "gpu_memory_percent": f"{final_metrics.get('gpu_memory_percent', 0):.1f}",
-                    "gpu_utilization_percent": f"{final_metrics.get('gpu_utilization', 0):.1f}",
-                    "likely_bottleneck": bottleneck,
-                    "suggested_thread_count": suggested_threads,
                 }
-
-                # Merge detailed metrics into performance metrics
+                
+                # Add resource metrics if we collected them
+                if initial_metrics and 'final_metrics' in locals():
+                    detailed_metrics.update({
+                        "system_memory_delta_mb": f"{final_metrics.get('system_memory_mb', 0) - initial_metrics.get('system_memory_mb', 0):.1f}",
+                    })
+                    
+                    # Add GPU metrics if available
+                    if torch.cuda.is_available():
+                        detailed_metrics.update({
+                            "gpu_memory_used_mb": f"{final_metrics.get('gpu_memory_mb', 0):.1f}", 
+                        })
+                
+                # Add detailed metrics to performance metrics
                 performance_metrics.update(detailed_metrics)
-
-            # Log performance metrics in a structured format
-            if collect_detailed_metrics:
-                logger.debug(
-                    f"BATCH_LINE {' '.join([f'{k}={v}' for k, v in performance_metrics.items()])}"
-                )
-
-            # Add summarized metrics to canonical log
+            
+            # Log summary metrics
             batch_canonical_log.log_success(logger, performance_metrics)
         else:
-            # If performance metrics are disabled, just log basic success
+            # If metrics collection is disabled, just log basic success
             batch_canonical_log.log_success(
                 logger,
                 {
-                    "successful_images": len(
-                        [r for r in results if "error" not in r or not r["error"]]
-                    ),
-                    "failed_images": len(
-                        [r for r in results if "error" in r and r["error"]]
-                    ),
+                    "successful_images": len([r for r in results if not r.get("error", "")]),
+                    "failed_images": len([r for r in results if r.get("error", "")]),
+                    "total_time_seconds": f"{time.time() - start_time:.3f}",
                 },
             )
 
+        # Perform a cleanup at the end of batch processing if using GPU
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            
         return results, performance_metrics
 
     except Exception as e:
@@ -937,7 +723,8 @@ def process_batch_images(
         # Log error with canonical log line
         batch_canonical_log.log_error(logger, e, traceback.format_exc())
 
-        return [{"error": str(e), "processed_image": "", "parsed_content": ""}], {}
+        error_result = {"error": str(e), "processed_image": "", "parsed_content": ""}
+        return [error_result for _ in range(len(images))], {}
 
 
 def create_modal_image():
@@ -1088,11 +875,6 @@ class FlaskOmniParserServer:
     def _setup_routes(self):
         """Set up Flask routes for the API endpoints"""
         from flask import request, jsonify
-
-        @self.web_app.route("/health", methods=["GET"])
-        def health_check():
-            """Health check endpoint to verify server is running"""
-            return jsonify({"status": "healthy", "version": "1.0.0"})
 
         @self.web_app.route("/process", methods=["POST"])
         def process():
