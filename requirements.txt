@@ -31,3 +31,4 @@ uiautomation
 dashscope
 groq
 modal
+flask

@@ -5,6 +5,13 @@
 
 OmniParserV2 Modal Cluster is a scalable, production-ready fork of [Microsoft's OmniParser](https://github.com/microsoft/OmniParser) that is optimized for cloud deployments using [Modal Labs](https://modal.com/). This project is designed for horizontal scaling, enabling multiple parallel instances to handle concurrent requests efficiently and process large volumes of data quickly.
 
+## Fixes lack of PaddleOCR thread safety
+The thread pool architecture prevents direct GPU conflicts between PyTorch and PaddlePaddle
+Each OCR instance gets its own thread and managed GPU access
+The queue system ensures orderly processing without resource contention
+Modern GPU drivers and CUDA versions handle multiple frameworks better
+Container isolation helps prevent framework conflicts
+
 ## Key Features
 
 - **Horizontal Scaling:** Deploy multiple instances to handle concurrent requests with dedicated GPU acceleration.
