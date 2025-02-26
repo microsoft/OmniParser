@@ -63,8 +63,7 @@ class PaddleOCRPool:
             self.return_ocr(ocr)
             return result
         except Exception as e:
-            if not should_suppress_logs():
-                print(f"PaddleOCR error: {str(e)}")
+            print(f"PaddleOCR error: {str(e)}")
             self.return_ocr(ocr)
             return []
 
@@ -72,8 +71,48 @@ class PaddleOCRPool:
         """Clean up resources"""
         self.executor.shutdown(wait=False)
 
-# Create global OCR pool with size based on CPU count
-paddle_ocr_pool = PaddleOCRPool(pool_size=min(os.cpu_count() or 1, 4))
+# Get OCR pool size from environment variable or calculate based on resources
+def get_optimal_ocr_pool_size():
+    """Calculate optimal OCR pool size based on available resources and environment settings"""
+    # First check if an environment variable is set
+    if 'PADDLE_OCR_POOL_SIZE' in os.environ:
+        try:
+            env_size = int(os.environ['PADDLE_OCR_POOL_SIZE'])
+            return max(1, env_size)  # Ensure at least 1
+        except (ValueError, TypeError):
+            pass  # Fall back to automatic calculation
+    
+    # Default size based on CPU cores and available memory
+    cpu_count = os.cpu_count() or 2
+    
+    # Check if GPU is available via torch
+    try:
+        import torch
+        has_gpu = torch.cuda.is_available()
+        if has_gpu:
+            # If we have a GPU, we can use more OCR instances
+            # Get GPU memory in GB
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            
+            # Scale pool size based on GPU memory
+            # Assuming each PaddleOCR instance uses about 2-3GB
+            if gpu_memory > 40:  # High-end GPU (like H100 with 80GB)
+                return min(32, cpu_count * 2)  # Very large pool for high-end GPUs
+            elif gpu_memory > 20:  # Mid-high end GPU
+                return min(24, cpu_count * 2)  # Large pool
+            elif gpu_memory > 10:  # Mid-range GPU
+                return min(16, cpu_count)  # Medium pool
+            else:  # Entry-level GPU
+                return min(8, cpu_count)  # Smaller pool
+        else:
+            # CPU-only mode - be more conservative
+            return min(8, cpu_count)
+    except (ImportError, Exception):
+        # If torch is not available or error occurs, use CPU count with cap
+        return min(8, cpu_count)
+
+# Create global OCR pool with optimized size
+paddle_ocr_pool = PaddleOCRPool(pool_size=get_optimal_ocr_pool_size())
 
 import time
 import base64

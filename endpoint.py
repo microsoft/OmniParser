@@ -7,6 +7,7 @@ import os
 import logging
 import sys
 import time
+import signal
 from typing import Dict, List, Optional, Any, Callable, Tuple
 import traceback
 import json
@@ -24,6 +25,7 @@ from util.utils import (
     get_yolo_model,
     get_caption_model_processor,
     get_som_labeled_img,
+    paddle_ocr_pool,
 )
 
 # Default configuration values
@@ -32,7 +34,7 @@ DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "H100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_MAX_BATCH_SIZE = 1000
+DEFAULT_MAX_BATCH_SIZE = 100
 DEFAULT_LOG_LEVEL = "DEBUG"  # DEBUG, INFO, CRITICAL
 
 # Default request parameters
@@ -59,7 +61,6 @@ ENV_CONFIG = {
     ),
     "LOG_LEVEL": os.environ.get("LOG_LEVEL", DEFAULT_LOG_LEVEL).upper(),
 }
-
 
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
@@ -563,7 +564,7 @@ def process_batch_images(
     omniparser: OmniParser,
     images: List[str],
     process_params: Dict[str, Any],
-    MAX_BATCH_SIZE: int = DEFAULT_MAX_BATCH_SIZE,
+    max_batch_size: int = DEFAULT_MAX_BATCH_SIZE,
     collect_metrics: bool = True,
     collect_detailed_metrics: bool = False,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
@@ -575,7 +576,7 @@ def process_batch_images(
         omniparser: OmniParser instance to use for processing
         images: List of image data strings
         process_params: Parameters for image processing (box_threshold, iou_threshold, etc.)
-        MAX_BATCH_SIZE: Maximum number of threads to use
+        max_batch_size: Maximum number of threads to use
         collect_metrics: Whether to collect performance metrics
         collect_detailed_metrics: Whether to collect detailed performance metrics
 
@@ -584,13 +585,27 @@ def process_batch_images(
         - List of results for each image
         - Dictionary of performance metrics
     """
+    # Limit the batch size based on available resources to prevent thread contention
+    # Try to import the PaddleOCRPool size to align thread count with OCR resources
+    try:
+        from util.utils import paddle_ocr_pool
+        # Use a thread count of 2-3x the OCR pool size for best efficiency
+        recommended_batch_size = paddle_ocr_pool.pool_size * 2
+        # Cap at the configured max_batch_size
+        effective_batch_size = min(recommended_batch_size, max_batch_size)
+        logger.debug(f"[{request_id}] Adjusting batch size to {effective_batch_size} (OCR pool size: {paddle_ocr_pool.pool_size})")
+    except (ImportError, AttributeError):
+        # If we can't import paddle_ocr_pool, just use the configured max_batch_size
+        effective_batch_size = max_batch_size
+        logger.debug(f"[{request_id}] Using configured batch size: {effective_batch_size}")
+    
     batch_canonical_log = CanonicalLogger(
         request_id=request_id,
         endpoint="process_batched",
         request_params={
             "batch_size": len(images),
             **process_params,
-            "max_threads": MAX_BATCH_SIZE,
+            "max_threads": effective_batch_size,
         },
     )
 
@@ -701,8 +716,8 @@ def process_batch_images(
 
         # Process images in parallel using ThreadPoolExecutor
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=MAX_BATCH_SIZE
-        ) as executor:
+            max_workers=effective_batch_size
+        ) as executor:            
             # Create a list of future objects
             future_to_idx = {
                 executor.submit(process_with_metrics, idx, image_data): idx
@@ -792,57 +807,64 @@ def process_batch_images(
                 max_time = max(per_image_times.values()) if per_image_times else 0
                 min_time = min(per_image_times.values()) if per_image_times else 0
 
-                # Compute theoretical max throughput
+                # Compute actual throughput
                 throughput = len(images) / total_time
-                theoretical_max_throughput = (
-                    MAX_BATCH_SIZE / avg_time if avg_time > 0 else 0
-                )
-
-                # Performance analysis
-                thread_efficiency = (
-                    (throughput / theoretical_max_throughput) * 100
-                    if theoretical_max_throughput > 0
-                    else 0
-                )
+                
+                # Performance analysis focused on GPU utilization
+                gpu_utilization = final_metrics.get("gpu_utilization", 0)
+                gpu_memory_percent = final_metrics.get("gpu_memory_percent", 0)
+                
+                # Calculate efficiency based on GPU utilization instead of thread throughput
+                gpu_efficiency = gpu_utilization  # Direct measure of GPU usage
+                
+                # Determine bottleneck with focus on GPU utilization
                 bottleneck = "Unknown"
-                if thread_efficiency < 70:
-                    if (
-                        torch.cuda.is_available()
-                        and final_metrics.get("gpu_utilization", 0) > 90
-                    ):
-                        bottleneck = "GPU Compute"
-                    elif (
-                        torch.cuda.is_available()
-                        and final_metrics.get("gpu_memory_percent", 0) > 90
-                    ):
-                        bottleneck = "GPU Memory"
+                if gpu_utilization < 30:
+                    if max_active_threads < effective_batch_size:
+                        bottleneck = "Insufficient Threads"
                     elif final_metrics.get("system_memory_percent", 0) > 90:
                         bottleneck = "System Memory"
                     elif final_metrics.get("cpu_percent", 0) > 90:
                         bottleneck = "CPU"
                     else:
                         bottleneck = "Thread Synchronization or I/O"
+                elif gpu_utilization < 70:
+                    if gpu_memory_percent > 90:
+                        bottleneck = "GPU Memory"
+                    else:
+                        bottleneck = "Mixed CPU/GPU Processing"
+                else:
+                    bottleneck = "GPU Compute"
 
-                # Suggestion for optimal thread count
+                # Suggestion for optimal thread count based on GPU utilization
                 suggested_threads = max_active_threads
-                if thread_efficiency < 50 and max_active_threads >= MAX_BATCH_SIZE:
-                    suggested_threads = max(1, int(MAX_BATCH_SIZE * 0.7))
-                elif (
-                    thread_efficiency > 90
-                    and final_metrics.get("gpu_memory_percent", 0) < 80
-                ):
-                    suggested_threads = min(100, int(MAX_BATCH_SIZE * 1.3))
+                
+                # If GPU is underutilized, recommend more threads to increase load
+                if gpu_utilization < 40 and max_active_threads <= effective_batch_size:
+                    # Recommend more threads when GPU is idle
+                    suggested_threads = min(100, int(effective_batch_size * 1.5))
+                # If GPU memory is nearly full but utilization is low
+                elif gpu_memory_percent > 85 and gpu_utilization < 70:
+                    # Reduce thread count to prevent OOM but maintain processing
+                    suggested_threads = max(1, int(max_active_threads * 0.8))
+                # If GPU is well utilized (70-95%)
+                elif 70 <= gpu_utilization <= 95:
+                    # Keep current thread count as it's working well
+                    suggested_threads = max_active_threads
+                # If GPU is maxed out (>95%)
+                elif gpu_utilization > 95:
+                    # Slight reduction to prevent throttling
+                    suggested_threads = max(1, int(max_active_threads * 0.9))
 
                 # Add the detailed metrics
                 detailed_metrics = {
-                    "max_threads_config": MAX_BATCH_SIZE,
+                    "max_threads_config": effective_batch_size,
                     "max_active_threads": max_active_threads,
                     "avg_image_time_seconds": f"{avg_time:.3f}",
                     "min_image_time_seconds": f"{min_time:.3f}",
                     "max_image_time_seconds": f"{max_time:.3f}",
                     "images_per_second": f"{throughput:.2f}",
-                    "theoretical_max_throughput": f"{theoretical_max_throughput:.2f}",
-                    "thread_efficiency_percent": f"{thread_efficiency:.1f}",
+                    "gpu_efficiency_percent": f"{gpu_efficiency:.1f}",
                     "system_memory_used_mb": f"{final_metrics.get('system_memory_mb', 0):.1f}",
                     "system_memory_delta_mb": f"{memory_delta_mb:.1f}",
                     "system_memory_percent": f"{final_metrics.get('system_memory_percent', 0):.1f}",
@@ -1011,7 +1033,7 @@ class ModalContainer:
             omniparser=self.omniparser,
             images=req.images,
             process_params=process_params,
-            MAX_BATCH_SIZE=ENV_CONFIG["MAX_BATCH_SIZE"],
+            max_batch_size=ENV_CONFIG["MAX_BATCH_SIZE"],
             collect_metrics=collect_metrics,
             collect_detailed_metrics=collect_detailed_metrics,
         )
@@ -1122,7 +1144,7 @@ class FlaskOmniParserServer:
                 omniparser=self.omniparser,
                 images=data["images"],
                 process_params=process_params,
-                MAX_BATCH_SIZE=ENV_CONFIG["MAX_BATCH_SIZE"],
+                max_batch_size=ENV_CONFIG["MAX_BATCH_SIZE"],
                 collect_metrics=collect_metrics,
                 collect_detailed_metrics=collect_detailed_metrics,
             )
