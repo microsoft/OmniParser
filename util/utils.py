@@ -19,109 +19,16 @@ import numpy as np
 from matplotlib import pyplot as plt
 import easyocr
 from paddleocr import PaddleOCR
-import threading
-from queue import Queue
-from concurrent.futures import ThreadPoolExecutor
-
 reader = easyocr.Reader(['en'])
-
-class PaddleOCRPool:
-    def __init__(self, pool_size=16):
-        self.pool_size = pool_size
-        self.ocr_queue = Queue()
-        # Create a larger thread pool for better resource utilization
-        # and to prevent thread starvation
-        self.executor = ThreadPoolExecutor(
-            max_workers=pool_size * 3,  # Increase worker count to 3x pool size
-            thread_name_prefix="OCR-Worker"
-        )
-        self._initialize_pool()
-
-    def _initialize_pool(self):
-        """Initialize pool of PaddleOCR instances"""
-        for _ in range(self.pool_size):
-            ocr = PaddleOCR(
-                lang='en',
-                use_angle_cls=False,
-                use_gpu=True,
-                show_log=False,
-                max_batch_size=1024,
-                use_dilation=True,
-                det_db_score_mode='slow',
-                rec_batch_num=1024
-            )
-            self.ocr_queue.put(ocr)
-
-    def get_ocr(self):
-        """Get a PaddleOCR instance from the pool"""
-        return self.ocr_queue.get()
-
-    def return_ocr(self, ocr):
-        """Return a PaddleOCR instance to the pool"""
-        self.ocr_queue.put(ocr)
-
-    def process_image(self, image_np, cls=False):
-        """Process an image with PaddleOCR with better error handling and retries"""
-        max_retries = 2
-        retry_count = 0
-        
-        while retry_count <= max_retries:
-            try:
-                ocr = self.get_ocr()
-                result = ocr.ocr(image_np, cls=cls)
-                self.return_ocr(ocr)
-                return result
-            except Exception as e:
-                retry_count += 1
-                if retry_count <= max_retries:
-                    print(f"PaddleOCR error: {str(e)}, retrying ({retry_count}/{max_retries})...")
-                    time.sleep(0.1)  # Small delay before retry
-                else:
-                    print(f"PaddleOCR error after {max_retries} retries: {str(e)}")
-                    # Make sure to return the OCR instance to the pool even on failure
-                    if 'ocr' in locals():
-                        self.return_ocr(ocr)
-                    return []
-
-    def __del__(self):
-        """Clean up resources"""
-        self.executor.shutdown(wait=False)
-
-# Get OCR pool size from environment variable or calculate based on resources
-def get_optimal_ocr_pool_size():
-    """Calculate optimal OCR pool size based on available resources and environment settings"""
-    # Default size based on CPU cores and available memory
-    cpu_count = os.cpu_count() or 2
-    
-    # Check if GPU is available via torch
-    try:
-        import torch
-        has_gpu = torch.cuda.is_available()
-        if has_gpu:
-            # If we have a GPU, we can use more OCR instances
-            # Get GPU memory in GB
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            
-            # Scale pool size based on GPU memory
-            # Increased pool sizes based on performance metrics
-            if gpu_memory > 40:  # High-end GPU (like H100 with 80GB)
-                return min(40, cpu_count * 3)  # Increased from 32 to 40
-            elif gpu_memory > 20:  # Mid-high end GPU
-                return min(30, cpu_count * 2)  # Increased from 24 to 30
-            elif gpu_memory > 10:  # Mid-range GPU
-                return min(20, cpu_count)  # Increased from 16 to 20
-            else:  # Entry-level GPU
-                return min(10, cpu_count)  # Increased from 8 to 10
-        else:
-            # CPU-only mode - be more conservative
-            return min(8, cpu_count)
-    except (ImportError, Exception):
-        # If torch is not available or error occurs, use CPU count with cap
-        return min(8, cpu_count)
-
-# Create global OCR pool with optimized size
-paddle_ocr_pool = PaddleOCRPool(pool_size=get_optimal_ocr_pool_size())
-
+paddle_ocr = PaddleOCR(
+    lang='en',  # other lang also available
+    use_angle_cls=False,
+    use_gpu=False,  # using cuda will conflict with pytorch in the same process
+    show_log=False,
+    max_batch_size=1024,
+    use_dilation=True,  # improves accuracy
+    det_db_score_mode='slow',  # improves accuracy
+    rec_batch_num=1024)
 import time
 import base64
 
@@ -325,6 +232,7 @@ def remove_overlap_new(boxes, iou_threshold, ocr_bbox=None):
     '''
     ocr_bbox format: [{'type': 'text', 'bbox':[x,y], 'interactivity':False, 'content':str }, ...]
     boxes format: [{'type': 'icon', 'bbox':[x,y], 'interactivity':True, 'content':None }, ...]
+
     '''
     assert ocr_bbox is None or isinstance(ocr_bbox, List)
 
@@ -349,18 +257,21 @@ def remove_overlap_new(boxes, iou_threshold, ocr_bbox=None):
         return max(intersection / union, ratio1, ratio2)
 
     def is_inside(box1, box2):
+        # return box1[0] >= box2[0] and box1[1] >= box2[1] and box1[2] <= box2[2] and box1[3] <= box2[3]
         intersection = intersection_area(box1, box2)
         ratio1 = intersection / box_area(box1)
         return ratio1 > 0.80
 
+    # boxes = boxes.tolist()
     filtered_boxes = []
     if ocr_bbox:
         filtered_boxes.extend(ocr_bbox)
-
+    # print('ocr_bbox!!!', ocr_bbox)
     for i, box1_elem in enumerate(boxes):
         box1 = box1_elem['bbox']
         is_valid_box = True
         for j, box2_elem in enumerate(boxes):
+            # keep the smaller box
             box2 = box2_elem['bbox']
             if i != j and IoU(box1, box2) > iou_threshold and box_area(box1) > box_area(box2):
                 is_valid_box = False
@@ -373,42 +284,29 @@ def remove_overlap_new(boxes, iou_threshold, ocr_bbox=None):
                 for box3_elem in ocr_bbox:
                     if not box_added:
                         box3 = box3_elem['bbox']
-                        if is_inside(box3, box1):  # ocr inside icon
+                        if is_inside(box3, box1): # ocr inside icon
+                            # box_added = True
+                            # delete the box3_elem from ocr_bbox
                             try:
+                                # gather all ocr labels
                                 ocr_labels += box3_elem['content'] + ' '
                                 filtered_boxes.remove(box3_elem)
                             except:
                                 continue
-                        elif is_inside(box1, box3):  # icon inside ocr
+                            # break
+                        elif is_inside(box1, box3): # icon inside ocr, don't added this icon box, no need to check other ocr bbox bc no overlap between ocr bbox, icon can only be in one ocr box
                             box_added = True
                             break
+                        else:
+                            continue
                 if not box_added:
                     if ocr_labels:
-                        filtered_boxes.append({
-                            'type': 'icon',
-                            'bbox': box1_elem['bbox'],
-                            'interactivity': True,
-                            'content': ocr_labels.strip(),
-                            'source': 'box_yolo_content_ocr'
-                        })
+                        filtered_boxes.append({'type': 'icon', 'bbox': box1_elem['bbox'], 'interactivity': True, 'content': ocr_labels, 'source':'box_yolo_content_ocr'})
                     else:
-                        filtered_boxes.append({
-                            'type': 'icon',
-                            'bbox': box1_elem['bbox'],
-                            'interactivity': True,
-                            'content': None,
-                            'source': 'box_yolo_content_yolo'
-                        })
+                        filtered_boxes.append({'type': 'icon', 'bbox': box1_elem['bbox'], 'interactivity': True, 'content': None, 'source':'box_yolo_content_yolo'})
             else:
-                filtered_boxes.append({
-                    'type': 'icon',
-                    'bbox': box1_elem['bbox'],
-                    'interactivity': True,
-                    'content': None,
-                    'source': 'box_yolo_content_yolo'
-                })
-
-    return filtered_boxes
+                filtered_boxes.append(box1)
+    return filtered_boxes # torch.tensor(filtered_boxes)
 
 
 def load_image(image_path: str) -> Tuple[np.array, torch.Tensor]:
@@ -530,49 +428,21 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     # annotate the image with labels
     if ocr_bbox:
         ocr_bbox = torch.tensor(ocr_bbox) / torch.Tensor([w, h, w, h])
-        ocr_bbox = ocr_bbox.tolist()
+        ocr_bbox=ocr_bbox.tolist()
     else:
-        ocr_bbox = []  # Use empty list instead of None
-        ocr_text = []  # Ensure ocr_text is also empty when no bbox
+        # print('no ocr bbox!!!')
+        ocr_bbox = None
 
-    # Create OCR elements list only if we have valid OCR results
-    ocr_bbox_elem = []
-    if ocr_bbox and ocr_text:  # Only process if both lists have content
-        ocr_bbox_elem = [
-            {
-                'type': 'text',
-                'bbox': box,
-                'interactivity': False,
-                'content': txt,
-                'source': 'box_ocr_content_ocr'
-            }
-            for box, txt in zip(ocr_bbox, ocr_text)
-            if int_box_area(box, w, h) > 0
-        ]
-
-    # Process YOLO detections
-    xyxy_elem = [
-        {
-            'type': 'icon',
-            'bbox': box,
-            'interactivity': True,
-            'content': None
-        }
-        for box in xyxy.tolist()
-        if int_box_area(box, w, h) > 0
-    ]
-
-    # Get filtered boxes and sort them
-    filtered_boxes_elem = remove_overlap_new(boxes=xyxy_elem, iou_threshold=iou_threshold, ocr_bbox=ocr_bbox_elem)
+    ocr_bbox_elem = [{'type': 'text', 'bbox':box, 'interactivity':False, 'content':txt, 'source': 'box_ocr_content_ocr'} for box, txt in zip(ocr_bbox, ocr_text) if int_box_area(box, w, h) > 0] 
+    xyxy_elem = [{'type': 'icon', 'bbox':box, 'interactivity':True, 'content':None} for box in xyxy.tolist() if int_box_area(box, w, h) > 0]
+    filtered_boxes = remove_overlap_new(boxes=xyxy_elem, iou_threshold=iou_threshold, ocr_bbox=ocr_bbox_elem)
     
-    # Sort the filtered boxes so that ones with content come before ones without content
-    filtered_boxes_elem = sorted(filtered_boxes_elem, key=lambda x: x['content'] is None)
-    
-    # Get the index of the first element with no content
+    # sort the filtered_boxes so that the one with 'content': None is at the end, and get the index of the first 'content': None
+    filtered_boxes_elem = sorted(filtered_boxes, key=lambda x: x['content'] is None)
+    # get the index of the first 'content': None
     starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
-    
-    # Convert bboxes to tensor after sorting
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
+    # print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
     # get parsed icon local semantics
     time1 = time.time()
@@ -595,6 +465,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
+    # print('time to get parsed content:', time.time()-time1)
 
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
@@ -645,24 +516,15 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             text_threshold = 0.5
         else:
             text_threshold = easyocr_args['text_threshold']
-        try:
-            result = paddle_ocr_pool.process_image(image_np, cls=False)
-            # Filter results with confidence above threshold
-            valid_results = [(item[0], item[1]) for item in result if len(item) >= 2 and isinstance(item[1], tuple) and len(item[1]) >= 2 and item[1][1] > text_threshold]
-            coord = [item[0] for item in valid_results] if valid_results else []
-            text = [item[1][0] for item in valid_results] if valid_results else []
-        except Exception as e:
-            coord, text = [], []  # Return empty lists on error
+        result = paddle_ocr.ocr(image_np, cls=False)[0]
+        coord = [item[0] for item in result if item[1][1] > text_threshold]
+        text = [item[1][0] for item in result if item[1][1] > text_threshold]
     else:  # EasyOCR
         if easyocr_args is None:
             easyocr_args = {}
-        try:
-            result = reader.readtext(image_np, **easyocr_args)
-            coord = [item[0] for item in result]
-            text = [item[1] for item in result]
-        except Exception as e:
-            coord, text = [], []  # Return empty lists on error
-
+        result = reader.readtext(image_np, **easyocr_args)
+        coord = [item[0] for item in result]
+        text = [item[1] for item in result]
     if display_img:
         opencv_img = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         bb = []
