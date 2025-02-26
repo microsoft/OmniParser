@@ -29,7 +29,12 @@ class PaddleOCRPool:
     def __init__(self, pool_size=16):
         self.pool_size = pool_size
         self.ocr_queue = Queue()
-        self.executor = ThreadPoolExecutor(max_workers=pool_size)
+        # Create a larger thread pool for better resource utilization
+        # and to prevent thread starvation
+        self.executor = ThreadPoolExecutor(
+            max_workers=pool_size * 3,  # Increase worker count to 3x pool size
+            thread_name_prefix="OCR-Worker"
+        )
         self._initialize_pool()
 
     def _initialize_pool(self):
@@ -56,16 +61,27 @@ class PaddleOCRPool:
         self.ocr_queue.put(ocr)
 
     def process_image(self, image_np, cls=False):
-        """Process an image with PaddleOCR"""
-        try:
-            ocr = self.get_ocr()
-            result = ocr.ocr(image_np, cls=cls)
-            self.return_ocr(ocr)
-            return result
-        except Exception as e:
-            print(f"PaddleOCR error: {str(e)}")
-            self.return_ocr(ocr)
-            return []
+        """Process an image with PaddleOCR with better error handling and retries"""
+        max_retries = 2
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                ocr = self.get_ocr()
+                result = ocr.ocr(image_np, cls=cls)
+                self.return_ocr(ocr)
+                return result
+            except Exception as e:
+                retry_count += 1
+                if retry_count <= max_retries:
+                    print(f"PaddleOCR error: {str(e)}, retrying ({retry_count}/{max_retries})...")
+                    time.sleep(0.1)  # Small delay before retry
+                else:
+                    print(f"PaddleOCR error after {max_retries} retries: {str(e)}")
+                    # Make sure to return the OCR instance to the pool even on failure
+                    if 'ocr' in locals():
+                        self.return_ocr(ocr)
+                    return []
 
     def __del__(self):
         """Clean up resources"""
