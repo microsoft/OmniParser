@@ -95,15 +95,15 @@ def get_optimal_ocr_pool_size():
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
             
             # Scale pool size based on GPU memory
-            # Assuming each PaddleOCR instance uses about 2-3GB
+            # Increased pool sizes based on performance metrics
             if gpu_memory > 40:  # High-end GPU (like H100 with 80GB)
-                return min(32, cpu_count * 2)  # Very large pool for high-end GPUs
+                return min(40, cpu_count * 3)  # Increased from 32 to 40
             elif gpu_memory > 20:  # Mid-high end GPU
-                return min(24, cpu_count * 2)  # Large pool
+                return min(30, cpu_count * 2)  # Increased from 24 to 30
             elif gpu_memory > 10:  # Mid-range GPU
-                return min(16, cpu_count)  # Medium pool
+                return min(20, cpu_count)  # Increased from 16 to 20
             else:  # Entry-level GPU
-                return min(8, cpu_count)  # Smaller pool
+                return min(10, cpu_count)  # Increased from 8 to 10
         else:
             # CPU-only mode - be more conservative
             return min(8, cpu_count)

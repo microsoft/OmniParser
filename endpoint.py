@@ -19,6 +19,7 @@ import threading
 import torch
 import GPUtil  # type: ignore
 from pydantic import BaseModel, Field, field_validator
+import random
 
 from util.utils import (
     check_ocr_box,
@@ -34,8 +35,8 @@ DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "H100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
-DEFAULT_MAX_BATCH_SIZE = 100
-DEFAULT_LOG_LEVEL = "DEBUG"  # DEBUG, INFO, CRITICAL
+DEFAULT_MAX_BATCH_SIZE = 30
+DEFAULT_LOG_LEVEL = "DEBUG"
 
 # Default request parameters
 DEFAULT_BOX_THRESHOLD = 0.05
@@ -590,13 +591,15 @@ def process_batch_images(
     try:
         from util.utils import paddle_ocr_pool
         # Use a thread count of 2-3x the OCR pool size for best efficiency
-        recommended_batch_size = paddle_ocr_pool.pool_size * 2
+        # Increased multiplier from 2 to 3 based on performance metrics
+        recommended_batch_size = min(paddle_ocr_pool.pool_size * 3, len(images))
         # Cap at the configured max_batch_size
         effective_batch_size = min(recommended_batch_size, max_batch_size)
-        logger.debug(f"[{request_id}] Adjusting batch size to {effective_batch_size} (OCR pool size: {paddle_ocr_pool.pool_size})")
+        logger.debug(f"[{request_id}] Adjusting batch size to {effective_batch_size} (OCR pool size: {paddle_ocr_pool.pool_size}, images: {len(images)})")
     except (ImportError, AttributeError):
         # If we can't import paddle_ocr_pool, just use the configured max_batch_size
-        effective_batch_size = max_batch_size
+        # But still respect the number of images
+        effective_batch_size = min(max_batch_size, len(images))
         logger.debug(f"[{request_id}] Using configured batch size: {effective_batch_size}")
     
     batch_canonical_log = CanonicalLogger(
@@ -701,11 +704,18 @@ def process_batch_images(
                 # Release resources explicitly if detailed metrics are enabled
                 if collect_detailed_metrics and torch.cuda.is_available():
                     torch.cuda.empty_cache()
-
+                
+                # Always perform garbage collection to reduce memory pressure
+                # This helps prevent thread contention by freeing resources more aggressively
                 if collect_metrics:
                     # Explicitly trigger garbage collection in debug mode
                     if collect_detailed_metrics:
                         gc.collect()
+                    else:
+                        # Lighter GC for production but still perform some cleanup
+                        # This helps with thread synchronization by freeing resources
+                        if random.random() < 0.2:  # Only perform GC on ~20% of threads to avoid GC overhead
+                            gc.collect(generation=0)  # Only collect youngest generation
 
                     # Decrement active thread count
                     with thread_counter_lock:
