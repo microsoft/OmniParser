@@ -8,10 +8,13 @@ import logging
 import sys
 import time
 from typing import Dict, List, Optional, Any
-import traceback
 import json
 import uuid
 
+from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field, validator
 
 from util.utils import (
@@ -49,6 +52,7 @@ ENV_CONFIG = {
     ),
 }
 
+
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
     logger = logging.getLogger("omniparser")
@@ -74,23 +78,22 @@ logger = setup_logging()
 logger.info(f"Environment configuration loaded: {ENV_CONFIG}")
 
 
-class CanonicalLogger:
-    """Helper class for creating canonical log lines."""
+class RequestLogger:
+    """Simplified logging helper for tracking request processing metrics."""
 
-    def __init__(self, request_id, endpoint, request_params=None):
+    def __init__(self, request_id, endpoint):
         self.start_time = time.time()
         self.request_id = request_id
         self.endpoint = endpoint
-        self.request_params = request_params or {}
         self.timings = {}
         self.current_step = None
         self.step_start_time = None
-        self.metadata = {}
 
     def start_step(self, step_name):
         """Start timing a new processing step."""
         self.current_step = step_name
         self.step_start_time = time.time()
+        logger.debug(f"[{self.request_id}] Step '{step_name}' started")
         return self
 
     def end_step(self):
@@ -98,94 +101,32 @@ class CanonicalLogger:
         if self.current_step and self.step_start_time:
             duration = time.time() - self.step_start_time
             self.timings[self.current_step] = round(duration, 3)
+            step_name = self.current_step  # Save before clearing
             self.current_step = None
             self.step_start_time = None
+            logger.debug(
+                f"[{self.request_id}] Step '{step_name}' completed in {duration:.3f}s"
+            )
         return self
 
-    def add_metadata(self, key, value):
-        """Add additional metadata to be included in the log line."""
-        self.metadata[key] = value
-        return self
-
-    def log_success(self, logger_instance, additional_data=None):
-        """Log a successful request with all collected information."""
+    def log_completion(self, success=True, error=None, metadata=None):
+        """Log completion of request processing with metrics."""
         total_duration = time.time() - self.start_time
 
-        log_data = {
-            "request_id": self.request_id,
-            "endpoint": self.endpoint,
-            "total_duration": round(total_duration, 3),
-            "status": "success",
-            "timings": self.timings,
-        }
-
-        # Add request parameters
-        if self.request_params:
-            log_data["request_params"] = self.request_params
-
-        # Add metadata
-        if self.metadata:
-            log_data.update(self.metadata)
-
-        # Add any additional data
-        if additional_data:
-            log_data.update(additional_data)
-
-        # Convert to logfmt style
-        logfmt_line = " ".join(
-            [f"{k}={self._format_value(v)}" for k, v in log_data.items()]
-        )
-        logger_instance.info(f"REQUEST_LOG {logfmt_line}")
-
-    def log_error(self, logger_instance, error, traceback_str=None):
-        """Log a failed request with error information."""
-        total_duration = time.time() - self.start_time
-
-        log_data = {
-            "request_id": self.request_id,
-            "endpoint": self.endpoint,
-            "total_duration": round(total_duration, 3),
-            "status": "error",
-            "error": str(error),
-            "timings": self.timings,
-        }
-
-        # Add request parameters
-        if self.request_params:
-            log_data["request_params"] = self.request_params
-
-        # Add metadata
-        if self.metadata:
-            log_data.update(self.metadata)
-
-        # Convert to logfmt style
-        logfmt_line = " ".join(
-            [f"{k}={self._format_value(v)}" for k, v in log_data.items()]
-        )
-        logger_instance.error(f"CANONICAL_LOG {logfmt_line}")
-
-        # Log traceback separately for debugging if provided
-        if traceback_str and logger_instance.isEnabledFor(logging.DEBUG):
-            logger_instance.debug(f"Traceback for {self.request_id}: {traceback_str}")
-
-    def _format_value(self, value):
-        """Format a value for logfmt style logging."""
-        if isinstance(value, dict):
-            # Convert dict to a compact string representation
-            return json.dumps(value, separators=(",", ":"))
-        elif isinstance(value, (list, tuple)):
-            # Convert list/tuple to a compact string representation
-            return json.dumps(value, separators=(",", ":"))
-        elif isinstance(value, bool):
-            return str(value).lower()
-        elif value is None:
-            return "null"
+        if success:
+            status_msg = "successfully"
+            log_fn = logger.info
         else:
-            # Quote strings that contain spaces or special characters
-            value_str = str(value)
-            if " " in value_str or "=" in value_str or '"' in value_str:
-                return '"' + value_str.replace('"', '\\"') + '"'
-            return value_str
+            status_msg = f"with error: {error}"
+            log_fn = logger.error
+
+        # Include any provided metadata in the log
+        meta_str = f" | {metadata}" if metadata else ""
+
+        log_fn(
+            f"[{self.request_id}] Request to '{self.endpoint}' completed {status_msg} "
+            f"in {total_duration:.3f}s | Steps: {json.dumps(self.timings)}{meta_str}"
+        )
 
 
 class ImageProcessor:
@@ -205,7 +146,6 @@ class ImageProcessor:
         Raises:
             ValueError: If the image format is unsupported
         """
-
         try:
             if isinstance(image_input, np.ndarray):
                 return Image.fromarray(image_input)
@@ -227,7 +167,7 @@ class ImageProcessor:
 
             raise ValueError(f"Unsupported image input format: {type(image_input)}")
         except Exception as e:
-
+            logger.error(f"Image conversion error: {str(e)}")
             raise ValueError(f"Image conversion error: {str(e)}") from e
 
     @staticmethod
@@ -306,25 +246,31 @@ class OmniParser:
     """Main class for parsing images and extracting information from UI elements."""
 
     def __init__(self):
-        """Initialize models upon OmniParser instantiation"""
+        """Initialize the OmniParser with null models (to be loaded later)"""
         self.yolo_model = None
         self.caption_model_processor = None
-        self.init_models()
+        self.models_initialized = False
 
     def init_models(self):
-        """Initialize models for both Modal and local environments."""
+        """Initialize and load the ML models."""
+        if self.models_initialized:
+            return
+
         try:
+            # Configure PyTorch for better performance
             import torch
 
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.benchmark = True
 
+            # Load models
             self.yolo_model = get_yolo_model(model_path="weights/icon_detect/model.pt")
             self.caption_model_processor = get_caption_model_processor(
                 model_name="florence2",
                 model_name_or_path="weights/icon_caption_florence",
             )
-            logger.info("Models initialized successfully")
+            self.models_initialized = True
+            logger.info("OmniParser models initialized successfully")
         except Exception as e:
             logger.critical(f"Failed to initialize models: {str(e)}")
             raise RuntimeError(f"Model initialization failed: {str(e)}") from e
@@ -349,37 +295,24 @@ class OmniParser:
 
         Returns:
             Dict containing processed image and parsed content
-
-        Raises:
-            Exception: If processing fails
         """
         request_id = f"req_{str(uuid.uuid4())[:8]}"
+        request_log = RequestLogger(request_id=request_id, endpoint="process_image")
 
-        # Initialize canonical logger for this request
-        canonical_log = CanonicalLogger(
-            request_id=request_id,
-            endpoint="process_image",
-            request_params={
-                "box_threshold": box_threshold,
-                "iou_threshold": iou_threshold,
-                "use_paddleocr": use_paddleocr,
-                "imgsz": imgsz,
-            },
-        )
+        # Ensure models are initialized
+        if not self.models_initialized:
+            self.init_models()
 
         try:
             # Convert and process image
-            canonical_log.start_step("image_conversion")
+            request_log.start_step("image_conversion")
             image = ImageProcessor.convert_to_pil_image({"image": image_data})
             draw_bbox_config = ImageProcessor.get_bbox_config(image)
-            canonical_log.end_step()
-
-            # Set up utils to avoid logging
-            os.environ["OMNIPARSER_SUPPRESS_UTILS_LOGS"] = "1"
+            request_log.end_step()
 
             # Perform OCR
-            canonical_log.start_step("ocr_processing")
-            ocr_bbox_rslt, _ = check_ocr_box(
+            request_log.start_step("ocr_processing")
+            ocr_bbox_rslt, is_goal_filtered = check_ocr_box(
                 image,
                 display_img=False,
                 output_bb_format="xyxy",
@@ -388,11 +321,10 @@ class OmniParser:
                 use_paddleocr=use_paddleocr,
             )
             text, ocr_bbox = ocr_bbox_rslt
-            canonical_log.add_metadata("text_elements_count", len(text))
-            canonical_log.end_step()
+            request_log.end_step()
 
             # Process image with ML models
-            canonical_log.start_step("icon_detection")
+            request_log.start_step("icon_detection")
             dino_labled_img, _, parsed_content_list = get_som_labeled_img(
                 image,
                 self.yolo_model,
@@ -405,11 +337,10 @@ class OmniParser:
                 iou_threshold=iou_threshold,
                 imgsz=imgsz,
             )
-            canonical_log.add_metadata("icons_detected", len(parsed_content_list))
-            canonical_log.end_step()
+            request_log.end_step()
 
             # Prepare response
-            canonical_log.start_step("response_preparation")
+            request_log.start_step("response_preparation")
             output_image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
             buffered = io.BytesIO()
             output_image.save(buffered, format="PNG")
@@ -422,35 +353,33 @@ class OmniParser:
                 "processed_image": encoded_image,
                 "parsed_content": parsed_content,
             }
-            canonical_log.end_step()
+            request_log.end_step()
 
-            # Log success with canonical log line
-            canonical_log.log_success(
-                logger,
-                {
+            # Log completion
+            request_log.log_completion(
+                metadata={
                     "image_width": image.width,
                     "image_height": image.height,
-                },
+                    "text_elements": len(text),
+                    "icons_detected": len(parsed_content_list),
+                }
             )
 
             return result
 
         except Exception as e:
-            # Stop timing current step if there is one
-            if canonical_log.current_step:
-                canonical_log.end_step()
+            # Log error and return error response
+            if request_log.current_step:
+                request_log.end_step()
 
-            # Log error with canonical log line
-            canonical_log.log_error(logger, e, traceback.format_exc())
+            error_msg = f"Processing failed: {str(e)}"
+            request_log.log_completion(success=False, error=error_msg)
 
             return {
                 "processed_image": "",
                 "parsed_content": "",
-                "error": f"Processing failed: {str(e)}",
+                "error": error_msg,
             }
-        finally:
-            # Reset utils logging suppression
-            os.environ.pop("OMNIPARSER_SUPPRESS_UTILS_LOGS", None)
 
 
 def create_modal_image():
@@ -474,25 +403,13 @@ def create_modal_image():
             "paddleocr",
             "gradio",
             "streamlit>=1.38.0",
-            "screeninfo",
-            "uiautomation",
-            "pyautogui==0.9.54",
-            "openai==1.3.5",
-            "anthropic[bedrock,vertex]>=0.37.1",
-            "dashscope",
-            "groq",
-            "azure-identity",
-            "boto3>=1.28.57",
-            "google-auth<3,>=2",
+            "fastapi>=0.109.0",
+            "uvicorn>=0.27.0",
             "httpx>=0.24.0",
+            "python-multipart",
             "numpy==1.26.4",
             "dill",
             "jsonschema==4.22.0",
-            "ruff==0.6.7",
-            "pre-commit==3.8.0",
-            "pytest==8.3.3",
-            "pytest-asyncio==0.23.6",
-            "flask",
         )
         .copy_local_file(
             "weights/icon_detect/model.pt", "/root/weights/icon_detect/model.pt"
@@ -522,46 +439,107 @@ class ModalContainer:
     @modal.enter()
     def enter(self):
         """Initialize models and configure PyTorch settings on container startup"""
-        self._configure_torch()
+        logger.info("Initializing Modal container...")
         self.omniparser.init_models()
 
-    def _configure_torch(self):
-        """Configure PyTorch performance settings"""
-        import torch
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.benchmark = True
-
-    def _process_request(self, req: ProcessRequest) -> Dict[str, Any]:
-        """Common request processing logic"""
-        return self.omniparser.process_image(
+    @modal.web_endpoint(method="POST")
+    def process_image(self, req: ProcessRequest) -> ProcessResult:
+        """Process a single image"""
+        result = self.omniparser.process_image(
             image_data=req.image_data,
             box_threshold=req.box_threshold,
             iou_threshold=req.iou_threshold,
             use_paddleocr=req.use_paddleocr,
             imgsz=req.imgsz,
         )
+        return ProcessResult(**result)
 
     @modal.web_endpoint(method="POST")
-    def process_batched(self, req: BatchProcessRequest) -> List[Dict[str, Any]]:
+    def process_batched(self, req: BatchProcessRequest) -> List[ProcessResult]:
         """Process multiple images in a single request"""
-        batch_canonical_log = CanonicalLogger(
-            request_id=f"batch_{str(uuid.uuid4())[:8]}",
-            endpoint="process_batched",
-            request_params={
-                "batch_size": len(req.images),
-                "box_threshold": req.box_threshold,
-                "iou_threshold": req.iou_threshold,
-                "use_paddleocr": req.use_paddleocr,
-                "imgsz": req.imgsz,
-            },
+        batch_id = f"batch_{str(uuid.uuid4())[:8]}"
+        logger.info(f"[{batch_id}] Processing batch of {len(req.images)} images")
+
+        results = []
+        for idx, image_data in enumerate(req.images):
+            logger.info(f"[{batch_id}] Processing image {idx+1}/{len(req.images)}")
+            result = self.omniparser.process_image(
+                image_data=image_data,
+                box_threshold=req.box_threshold,
+                iou_threshold=req.iou_threshold,
+                use_paddleocr=req.use_paddleocr,
+                imgsz=req.imgsz,
+            )
+            results.append(ProcessResult(**result))
+
+            # If an error occurred, log it but continue processing the batch
+            if "error" in result and result["error"]:
+                logger.warning(
+                    f"[{batch_id}] Error processing image {idx+1}: {result['error']}"
+                )
+
+        logger.info(f"[{batch_id}] Batch processing complete")
+        return results
+
+
+class FastApiOmniParser:
+    """FastAPI implementation for local deployment of OmniParser."""
+
+    def __init__(self):
+        """Initialize the FastAPI server with OmniParser instance"""
+        self.omniparser = OmniParser()
+        
+        # Define lifespan context manager
+        @asynccontextmanager
+        async def lifespan(app: FastAPI):
+            # Startup: initialize models
+            logger.info("Initializing models for FastAPI server...")
+            self.omniparser.init_models()
+            yield
+            # Shutdown: cleanup if needed
+            logger.info("Shutting down FastAPI server...")
+        
+        # Create FastAPI app with lifespan
+        self.api = FastAPI(
+            title="OmniParser API",
+            description="API for parsing UI screens",
+            version="1.0.0",
+            lifespan=lifespan
         )
+        
+        self._setup_routes()
+        logger.info("FastAPI server initialized")
 
-        try:
-            batch_canonical_log.start_step("batch_processing")
+    def _setup_routes(self):
+        """Set up FastAPI routes for the API endpoints"""
+
+        @self.api.post("/process_image", response_model=ProcessResult)
+        async def process_image(req: ProcessRequest, background_tasks: BackgroundTasks):
+            """Process a single image"""
+            result = self.omniparser.process_image(
+                image_data=req.image_data,
+                box_threshold=req.box_threshold,
+                iou_threshold=req.iou_threshold,
+                use_paddleocr=req.use_paddleocr,
+                imgsz=req.imgsz,
+            )
+
+            if "error" in result and result["error"]:
+                raise HTTPException(status_code=400, detail=result["error"])
+
+            return ProcessResult(**result)
+
+        @self.api.post("/process_batched", response_model=List[ProcessResult])
+        async def process_batched(
+            req: BatchProcessRequest, background_tasks: BackgroundTasks
+        ):
+            """Process multiple images in a single request"""
+            batch_id = f"batch_{str(uuid.uuid4())[:8]}"
+            logger.info(f"[{batch_id}] Processing batch of {len(req.images)} images")
+
             results = []
-
             for idx, image_data in enumerate(req.images):
-                batch_canonical_log.start_step(f"image_{idx}")
+                logger.info(f"[{batch_id}] Processing image {idx+1}/{len(req.images)}")
                 result = self.omniparser.process_image(
                     image_data=image_data,
                     box_threshold=req.box_threshold,
@@ -569,143 +547,54 @@ class ModalContainer:
                     use_paddleocr=req.use_paddleocr,
                     imgsz=req.imgsz,
                 )
-                
-                # Check if the current image processing failed
+                results.append(ProcessResult(**result))
+
+                # If an error occurred, log it but continue processing the batch
                 if "error" in result and result["error"]:
-                    # If there's an error, log it and raise an exception to fail the entire batch
-                    error_msg = f"Batch processing failed at image {idx}: {result['error']}"
-                    batch_canonical_log.end_step()
-                    batch_canonical_log.end_step()  # End both image step and batch step
-                    batch_canonical_log.log_error(logger, error_msg)
-                    raise ValueError(error_msg)
-                    
-                results.append(result)
-                batch_canonical_log.end_step()
-
-            batch_canonical_log.end_step()
-
-            # Log success with canonical log line
-            batch_canonical_log.log_success(
-                logger,
-                {
-                    "successful_images": len(results),
-                    "failed_images": 0,  # All must be successful at this point
-                },
-            )
-
-            return results
-        except Exception as e:
-            # Stop timing current step if there is one
-            if batch_canonical_log.current_step:
-                batch_canonical_log.end_step()
-
-            # Log error with canonical log line
-            batch_canonical_log.log_error(logger, e, traceback.format_exc())
-
-            return [{"error": str(e), "processed_image": "", "parsed_content": ""}]
-
-
-class FlaskOmniParserServer:
-    """Flask server for local deployment of OmniParser."""
-
-    def __init__(self):
-        """Initialize the Flask server with OmniParser instance"""
-        try:
-            from flask import Flask
-
-            self.omniparser = OmniParser()
-            self.web_app = Flask(__name__)
-            self._setup_routes()
-            logger.info("Flask server initialized successfully")
-        except ImportError as e:
-            logger.error(f"Failed to initialize Flask server: {str(e)}")
-            raise RuntimeError(
-                "Flask is required for local server. Please install Flask."
-            ) from e
-
-    def _setup_routes(self):
-        """Set up Flask routes for the API endpoints"""
-        from flask import request, jsonify
-
-        @self.web_app.route("/process_batched", methods=["POST"])
-        def process_batched():
-            """Process multiple images in a single request"""
-            data = request.get_json()
-            batch_canonical_log = CanonicalLogger(
-                request_id=f"flask_batch_{str(uuid.uuid4())[:8]}",
-                endpoint="/process_batched",
-                request_params={
-                    "batch_size": len(data["images"]),
-                    "box_threshold": data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                    "iou_threshold": data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                    "use_paddleocr": data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                    "imgsz": data.get("imgsz", DEFAULT_IMGSZ),
-                },
-            )
-
-            try:
-                batch_canonical_log.start_step("batch_processing")
-                results = []
-
-                for idx, image_data in enumerate(data["images"]):
-                    batch_canonical_log.start_step(f"image_{idx}")
-                    result = self.omniparser.process_image(
-                        image_data,
-                        data.get("box_threshold", DEFAULT_BOX_THRESHOLD),
-                        data.get("iou_threshold", DEFAULT_IOU_THRESHOLD),
-                        data.get("use_paddleocr", DEFAULT_USE_PADDLEOCR),
-                        data.get("imgsz", DEFAULT_IMGSZ),
+                    logger.warning(
+                        f"[{batch_id}] Error processing image {idx+1}: {result['error']}"
                     )
-                    
-                    # Check if the current image processing failed
-                    if "error" in result and result["error"]:
-                        # If there's an error, log it and raise an exception to fail the entire batch
-                        error_msg = f"Batch processing failed at image {idx}: {result['error']}"
-                        batch_canonical_log.end_step()
-                        batch_canonical_log.end_step()  # End both image step and batch step
-                        batch_canonical_log.log_error(logger, error_msg)
-                        return jsonify({"error": error_msg, "processed_image": "", "parsed_content": ""}), 400
-                        
-                    results.append(result)
-                    batch_canonical_log.end_step()
 
-                batch_canonical_log.end_step()
+            logger.info(f"[{batch_id}] Batch processing complete")
+            return results
 
-                # Log success with canonical log line
-                batch_canonical_log.log_success(
-                    logger,
-                    {
-                        "http_status": 200,
-                        "client_ip": request.remote_addr,
-                        "successful_images": len(results),
-                        "failed_images": 0,  # All must be successful at this point
-                    },
-                )
-
-                return jsonify(results)
-            except Exception as e:
-                # Stop timing current step if there is one
-                if batch_canonical_log.current_step:
-                    batch_canonical_log.end_step()
-
-                # Log error with canonical log line
-                batch_canonical_log.log_error(logger, e, traceback.format_exc())
-
-                error_response = {"error": str(e), "processed_image": "", "parsed_content": ""}
-                return jsonify(error_response), 500
+        # Add CORS middleware to allow cross-origin requests
+        self.api.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     def run(self, host="0.0.0.0", port=None, debug=False):
-        """Run the Flask server"""
+        """Run the FastAPI server"""
         port = port or ENV_CONFIG["API_PORT"]
-        logger.info(f"Starting Flask server on {host}:{port}")
-        self.web_app.run(host=host, port=port, debug=debug)
+        logger.info(f"Starting FastAPI server on {host}:{port}")
+        uvicorn.run(self.api, host=host, port=port, log_level="info")
 
 
 if __name__ == "__main__":
-    logger.info("Starting OmniParser API locally with Flask...")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="OmniParser API Server")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=ENV_CONFIG["API_PORT"],
+        help="Port to run the server on",
+    )
+    parser.add_argument(
+        "--host", type=str, default="0.0.0.0", help="Host to run the server on"
+    )
+    parser.add_argument("--debug", action="store_true", help="Run in debug mode")
+
+    args = parser.parse_args()
+
+    logger.info("Starting OmniParser API locally with FastAPI...")
     try:
-        server = FlaskOmniParserServer()
-        server.run(debug=True)
+        server = FastApiOmniParser()
+        server.run(host=args.host, port=args.port, debug=args.debug)
     except Exception as e:
         logger.critical(f"Failed to start server: {str(e)}")
         sys.exit(1)
