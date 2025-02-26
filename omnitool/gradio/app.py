@@ -249,7 +249,7 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        max_tokens=16384,
+        max_tokens=4096,
         omniparser_url=args.omniparser_server_url,
         azure_resource_name=state.get("azure_resource_name") if state["provider"] == "azure" else None
     ):  

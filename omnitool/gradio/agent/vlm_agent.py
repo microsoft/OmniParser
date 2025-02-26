@@ -105,26 +105,27 @@ class VLMAgent:
                 if not self.azure_resource_name:
                     raise ValueError("azure_resource_name is required when using Azure OpenAI")
                     
-            try:
-                result = run_azure_oai_interleaved(
-                    messages=planner_messages,
-                    system=system,
-                    deployment_name=deployment_name,
-                    api_key=self.api_key,
-                    resource_name=self.azure_resource_name,
-                    max_tokens=self.max_tokens,
-                )
+                try:
+                    result = run_azure_oai_interleaved(
+                        messages=planner_messages,
+                        system=system,
+                        deployment_name=deployment_name,
+                        api_key=self.api_key,
+                        resource_name=self.azure_resource_name,
+                        max_tokens=self.max_tokens,
+                    )
+                    
+                    if isinstance(result, tuple):
+                        vlm_response, token_usage = result
+                    else:
+                        # Handle error case or missing token usage
+                        vlm_response = result
+                        token_usage = 0  # Default to 0 if not provided
+                        print("Warning: Token usage information not available from Azure OpenAI")
+                except Exception as e:
+                    print(f"Error in Azure OpenAI call: {e}")
+                    raise e
                 
-                if isinstance(result, tuple):
-                    vlm_response, token_usage = result
-                else:
-                    # Handle error case or missing token usage
-                    vlm_response = result
-                    token_usage = 0  # Default to 0 if not provided
-                    print("Warning: Token usage information not available from Azure OpenAI")
-            except Exception as e:
-                print(f"Error in Azure OpenAI call: {e}")
-                raise e
             else:  # openai
                 vlm_response, token_usage = run_oai_interleaved(
                     messages=planner_messages,
