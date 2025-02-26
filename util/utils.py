@@ -48,33 +48,29 @@ class PaddleOCRPool:
             self.ocr_queue.put(ocr)
 
     def get_ocr(self):
-        """Get an OCR instance from the pool"""
+        """Get a PaddleOCR instance from the pool"""
         return self.ocr_queue.get()
 
     def return_ocr(self, ocr):
-        """Return an OCR instance to the pool"""
+        """Return a PaddleOCR instance to the pool"""
         self.ocr_queue.put(ocr)
 
     def process_image(self, image_np, cls=False):
-        """Process image using an OCR instance from the pool"""
-        ocr = self.get_ocr()
+        """Process an image with PaddleOCR"""
         try:
+            ocr = self.get_ocr()
             result = ocr.ocr(image_np, cls=cls)
-            # PaddleOCR can return None or empty list for images with no text
-            if not result or len(result) == 0:
-                return []
-            return result[0] or []  # Return empty list if first element is None
-        except Exception as e:
-            print(f"PaddleOCR error: {str(e)}")
-            return []  # Return empty list on error
-        finally:
             self.return_ocr(ocr)
+            return result
+        except Exception as e:
+            if not should_suppress_logs():
+                print(f"PaddleOCR error: {str(e)}")
+            self.return_ocr(ocr)
+            return []
 
     def __del__(self):
-        """Cleanup resources"""
-        self.executor.shutdown(wait=True)
-        while not self.ocr_queue.empty():
-            _ = self.ocr_queue.get()
+        """Clean up resources"""
+        self.executor.shutdown(wait=False)
 
 # Create global OCR pool with size based on CPU count
 paddle_ocr_pool = PaddleOCRPool(pool_size=min(os.cpu_count() or 1, 4))
@@ -444,12 +440,14 @@ def predict_yolo(model, image, box_threshold, imgsz, scale_img, iou_threshold=0.
         conf=box_threshold,
         imgsz=imgsz,
         iou=iou_threshold, # default 0.7
+        verbose=False
         )
     else:
         result = model.predict(
         source=image,
         conf=box_threshold,
         iou=iou_threshold, # default 0.7
+        verbose=False
         )
     boxes = result[0].boxes.xyxy#.tolist() # in pixel space
     conf = result[0].boxes.conf
@@ -487,7 +485,6 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
         ocr_bbox = torch.tensor(ocr_bbox) / torch.Tensor([w, h, w, h])
         ocr_bbox = ocr_bbox.tolist()
     else:
-        print('no ocr bbox!!!')
         ocr_bbox = []  # Use empty list instead of None
         ocr_text = []  # Ensure ocr_text is also empty when no bbox
 
@@ -529,7 +526,6 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     
     # Convert bboxes to tensor after sorting
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
-    print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
     # get parsed icon local semantics
     time1 = time.time()
@@ -552,7 +548,6 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
-    print('time to get parsed content:', time.time()-time1)
 
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
@@ -610,7 +605,6 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             coord = [item[0] for item in valid_results] if valid_results else []
             text = [item[1][0] for item in valid_results] if valid_results else []
         except Exception as e:
-            print(f"Error processing OCR: {str(e)}")
             coord, text = [], []  # Return empty lists on error
     else:  # EasyOCR
         if easyocr_args is None:
@@ -620,7 +614,6 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             coord = [item[0] for item in result]
             text = [item[1] for item in result]
         except Exception as e:
-            print(f"EasyOCR error: {str(e)}")
             coord, text = [], []  # Return empty lists on error
 
     if display_img:
