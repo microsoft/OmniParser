@@ -713,12 +713,6 @@ class FastApiOmniParser:
                 use_paddleocr=req.use_paddleocr,
                 imgsz=req.imgsz,
             )
-
-        # API health check endpoint
-        @self.api.get("/health")
-        async def health_check():
-            """Health check endpoint to verify API is operational"""
-            return {"status": "healthy", "version": "1.0.0"}
             
         # Add CORS middleware to allow cross-origin requests
         self.api.add_middleware(

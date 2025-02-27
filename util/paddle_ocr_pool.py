@@ -14,7 +14,7 @@ class PaddleOCRPool:
         pool_size=16,
         lang="en",
         use_angle_cls=False,
-        use_gpu=False,
+        use_gpu=True,
         show_log=False,
         max_batch_size=1024,
         use_dilation=True,
