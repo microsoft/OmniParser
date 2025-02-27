@@ -28,12 +28,12 @@ from util.utils import (
 
 # Default configuration values
 DEFAULT_CONCURRENCY_LIMIT = 1
-DEFAULT_CONTAINER_TIMEOUT = 300
+DEFAULT_CONTAINER_TIMEOUT = 500
 DEFAULT_GPU_CONFIG = "A100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
 DEFAULT_MAX_BATCH_SIZE = 1000
-DEFAULT_THREAD_POOL_SIZE = max(1, min(32, multiprocessing.cpu_count() * 2))
+DEFAULT_THREAD_POOL_SIZE = 40
 
 # Default request parameters
 DEFAULT_BOX_THRESHOLD = 0.05
@@ -431,6 +431,8 @@ class OmniParser:
             
         # Submit all image processing tasks to the executor
         futures_to_indices = {}
+        start_times = {}  # Track when each task actually starts processing
+
         for idx, image_data in enumerate(images):
             logger.info(f"[{batch_id}] Submitting image {idx+1}/{len(images)} for processing")
             future = self.batch_executor.submit(
@@ -442,6 +444,7 @@ class OmniParser:
                 imgsz=imgsz,
             )
             futures_to_indices[future] = idx
+            start_times[idx] = time.time()  # Record when task was submitted
 
         # Initialize results with empty ProcessResult objects
         results: List[ProcessResult] = [
@@ -450,20 +453,74 @@ class OmniParser:
         ]
         
         # Collect results as they complete
+        start_time = time.time()
+        successful_count = 0
+        failed_count = 0
+        processing_times = []
+
         for future in as_completed(futures_to_indices):
             idx = futures_to_indices[future]
             try:
+                # Calculate the total processing time for this image from submission to completion
+                image_processing_time = time.time() - start_times[idx]
+                processing_times.append(image_processing_time)
+                
                 result = future.result()
                 results[idx] = ProcessResult(**result)
-                logger.info(f"[{batch_id}] Completed processing image {idx+1}/{len(images)}")
+                successful_count += 1
+                logger.info(f"[{batch_id}] Completed processing image {idx+1}/{len(images)} in {image_processing_time:.2f}s")
             except Exception as e:
                 error_msg = f"Error processing image {idx+1}: {str(e)}"
                 logger.warning(f"[{batch_id}] {error_msg}")
+                failed_count += 1
                 results[idx] = ProcessResult(
                     processed_image="", parsed_content="", error=error_msg
                 )
 
-        logger.info(f"[{batch_id}] Parallel batch processing complete")
+        processing_time = time.time() - start_time
+        avg_time = processing_time/len(images) if images else 0
+        avg_per_img = sum(processing_times)/len(processing_times) if processing_times else 0
+        max_time = max(processing_times) if processing_times else 0
+        min_time = min(processing_times) if processing_times else 0
+        pool_size = ENV_CONFIG["THREAD_POOL_SIZE"]
+
+        # Calculate efficiency and provide tuning suggestions
+        total_processing_time = sum(processing_times)
+        if processing_time > 0 and total_processing_time > 0:
+            # True parallelism efficiency: ratio of total sequential time to actual time taken
+            parallelism_efficiency = min(1.0, total_processing_time / (processing_time * pool_size))
+        else:
+            parallelism_efficiency = 0
+
+        # Thread pool size suggestions
+        pool_suggestion = ""
+        batch_suggestion = ""
+
+        # Thread pool size suggestions
+        if parallelism_efficiency < 0.5 and pool_size > 2:
+            pool_suggestion = f" Consider reducing THREAD_POOL_SIZE (current: {pool_size})"
+        elif parallelism_efficiency > 0.9 and failed_count == 0:
+            pool_suggestion = f" Consider increasing THREAD_POOL_SIZE (current: {pool_size})"
+
+        # Batch size suggestions based on processing characteristics
+        current_batch_size = len(images)
+        if failed_count > 0 and (failed_count / current_batch_size) > 0.1:  # >10% failure rate
+            batch_suggestion = f" | Consider reducing batch size (current: {current_batch_size})"
+        elif max_time > 2.5 * avg_per_img and current_batch_size > 5:
+            # High variance in processing times may indicate resource contention
+            batch_suggestion = f" | Consider reducing batch size to improve consistency (current: {current_batch_size})"
+        elif max_time < 1.5 * avg_per_img and parallelism_efficiency > 0.8 and failed_count == 0 and current_batch_size < ENV_CONFIG["MAX_BATCH_SIZE"] // 2:
+            # Stable processing with good parallelism suggests batch size can be increased
+            batch_suggestion = f" | Consider increasing batch size for better throughput (current: {current_batch_size})"
+
+        logger.info(
+            f"[{batch_id}] Batch processing complete - Stats: "
+            f"Total: {len(images)} | Successful: {successful_count} | Failed: {failed_count} | "
+            f"Time: {processing_time:.2f}s | Avg: {avg_time:.2f}s per image | "
+            f"Thread pool size: {pool_size} | Parallelism efficiency: {parallelism_efficiency:.2f} | "
+            f"Image times - Avg: {avg_per_img:.2f}s | Min: {min_time:.2f}s | Max: {max_time:.2f}s"
+            f"{pool_suggestion}{batch_suggestion}"
+        )
         return results
 
     def __del__(self):
@@ -480,6 +537,7 @@ def create_modal_image():
         .apt_install("libgl1-mesa-glx", "libglib2.0-0")
         .pip_install(
             "accelerate",
+            "albumentations",
             "anthropic[bedrock,vertex]>=0.37.1",
             "azure-identity",
             "boto3>=1.28.57",
