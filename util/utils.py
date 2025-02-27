@@ -47,7 +47,7 @@ from util.box_annotator import BoxAnnotator
 def detect_device() -> str:
     if torch.cuda.is_available():
         return "cuda"
-    elif hasattr(torch, "mps") and torch.mps.is_available():
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         # Apple Silicon
         return "mps"
     else:
