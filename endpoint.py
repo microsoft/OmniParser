@@ -10,12 +10,14 @@ import time
 from typing import Dict, List, Optional, Any
 import json
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import multiprocessing
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from contextlib import asynccontextmanager
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 from util.utils import (
     check_ocr_box,
@@ -30,6 +32,8 @@ DEFAULT_CONTAINER_TIMEOUT = 300
 DEFAULT_GPU_CONFIG = "A100"
 DEFAULT_API_PORT = 7861
 DEFAULT_MAX_CONTAINERS = 10
+DEFAULT_MAX_BATCH_SIZE = 1000
+DEFAULT_THREAD_POOL_SIZE = max(1, min(32, multiprocessing.cpu_count() * 2))
 
 # Default request parameters
 DEFAULT_BOX_THRESHOLD = 0.05
@@ -50,8 +54,13 @@ ENV_CONFIG = {
     "MAX_CONTAINERS": int(
         os.environ.get("MAX_CONTAINERS", str(DEFAULT_MAX_CONTAINERS))
     ),
+    "MAX_BATCH_SIZE": int(
+        os.environ.get("MAX_BATCH_SIZE", str(DEFAULT_MAX_BATCH_SIZE))
+    ),
+    "THREAD_POOL_SIZE": int(
+        os.environ.get("THREAD_POOL_SIZE", str(DEFAULT_THREAD_POOL_SIZE))
+    ),
 }
-
 
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
@@ -201,7 +210,8 @@ class ProcessRequest(BaseModel):
     use_paddleocr: bool = Field(default=DEFAULT_USE_PADDLEOCR)
     imgsz: int = Field(default=DEFAULT_IMGSZ, ge=320, le=1920)
 
-    @validator("image_data")
+    @field_validator("image_data")
+    @classmethod
     def validate_image_data(cls, v):
         if not v.startswith("data:image"):
             raise ValueError("Image data must begin with 'data:image' prefix")
@@ -220,7 +230,8 @@ class BatchProcessRequest(BaseModel):
     use_paddleocr: bool = Field(default=DEFAULT_USE_PADDLEOCR)
     imgsz: int = Field(default=DEFAULT_IMGSZ, ge=320, le=1920)
 
-    @validator("images")
+    @field_validator("images")
+    @classmethod
     def validate_images(cls, v):
         if not v:
             raise ValueError("At least one image must be provided")
@@ -228,6 +239,12 @@ class BatchProcessRequest(BaseModel):
             if not img.startswith("data:image"):
                 raise ValueError("All image data must begin with 'data:image' prefix")
         return v
+        
+    @model_validator(mode='after')
+    def validate_batch_size(self):
+        if len(self.images) > ENV_CONFIG["MAX_BATCH_SIZE"]:
+            raise ValueError(f"Batch size exceeds maximum allowed ({ENV_CONFIG['MAX_BATCH_SIZE']})")
+        return self
 
 
 class ProcessResult(BaseModel):
@@ -250,6 +267,8 @@ class OmniParser:
         self.yolo_model = None
         self.caption_model_processor = None
         self.models_initialized = False
+        self.batch_executor = ThreadPoolExecutor(max_workers=ENV_CONFIG["THREAD_POOL_SIZE"])
+        logger.info(f"Initialized ThreadPoolExecutor for batch processing ({ENV_CONFIG['THREAD_POOL_SIZE']} workers)")
 
     def init_models(self):
         """Initialize and load the ML models."""
@@ -312,7 +331,8 @@ class OmniParser:
 
             # Perform OCR
             request_log.start_step("ocr_processing")
-            ocr_bbox_rslt, is_goal_filtered = check_ocr_box(
+            # Direct call to check_ocr_box which now uses the thread-safe PaddleOCRPool
+            (ocr_text, ocr_bbox), _ = check_ocr_box(
                 image,
                 display_img=False,
                 output_bb_format="xyxy",
@@ -320,7 +340,6 @@ class OmniParser:
                 easyocr_args={"paragraph": False, "text_threshold": 0.9},
                 use_paddleocr=use_paddleocr,
             )
-            text, ocr_bbox = ocr_bbox_rslt
             request_log.end_step()
 
             # Process image with ML models
@@ -333,7 +352,7 @@ class OmniParser:
                 ocr_bbox=ocr_bbox,
                 draw_bbox_config=draw_bbox_config,
                 caption_model_processor=self.caption_model_processor,
-                ocr_text=text,
+                ocr_text=ocr_text,
                 iou_threshold=iou_threshold,
                 imgsz=imgsz,
             )
@@ -360,7 +379,7 @@ class OmniParser:
                 metadata={
                     "image_width": image.width,
                     "image_height": image.height,
-                    "text_elements": len(text),
+                    "text_elements": len(ocr_text),
                     "icons_detected": len(parsed_content_list),
                 }
             )
@@ -380,6 +399,78 @@ class OmniParser:
                 "parsed_content": "",
                 "error": error_msg,
             }
+    
+    def process_batch(
+        self,
+        batch_id: str,
+        images: List[str],
+        box_threshold: float = DEFAULT_BOX_THRESHOLD,
+        iou_threshold: float = DEFAULT_IOU_THRESHOLD,
+        use_paddleocr: bool = DEFAULT_USE_PADDLEOCR,
+        imgsz: int = DEFAULT_IMGSZ,
+    ) -> List[ProcessResult]:
+        """
+        Process multiple images in parallel.
+        
+        Args:
+            batch_id: Unique identifier for this batch
+            images: List of base64 encoded image strings
+            box_threshold: Confidence threshold for bounding boxes
+            iou_threshold: IOU threshold for non-maximum suppression
+            use_paddleocr: Whether to use PaddleOCR for text detection
+            imgsz: Image size for processing
+            
+        Returns:
+            List of ProcessResult objects, one for each input image
+        """
+        logger.info(f"[{batch_id}] Processing batch of {len(images)} images in parallel")
+        
+        # Ensure models are initialized
+        if not self.models_initialized:
+            self.init_models()
+            
+        # Submit all image processing tasks to the executor
+        futures_to_indices = {}
+        for idx, image_data in enumerate(images):
+            logger.info(f"[{batch_id}] Submitting image {idx+1}/{len(images)} for processing")
+            future = self.batch_executor.submit(
+                self.process_image,
+                image_data=image_data,
+                box_threshold=box_threshold,
+                iou_threshold=iou_threshold,
+                use_paddleocr=use_paddleocr,
+                imgsz=imgsz,
+            )
+            futures_to_indices[future] = idx
+
+        # Initialize results with empty ProcessResult objects
+        results: List[ProcessResult] = [
+            ProcessResult(processed_image="", parsed_content="")
+            for _ in range(len(images))
+        ]
+        
+        # Collect results as they complete
+        for future in as_completed(futures_to_indices):
+            idx = futures_to_indices[future]
+            try:
+                result = future.result()
+                results[idx] = ProcessResult(**result)
+                logger.info(f"[{batch_id}] Completed processing image {idx+1}/{len(images)}")
+            except Exception as e:
+                error_msg = f"Error processing image {idx+1}: {str(e)}"
+                logger.warning(f"[{batch_id}] {error_msg}")
+                results[idx] = ProcessResult(
+                    processed_image="", parsed_content="", error=error_msg
+                )
+
+        logger.info(f"[{batch_id}] Parallel batch processing complete")
+        return results
+
+    def __del__(self):
+        """Clean up resources when the OmniParser instance is destroyed."""
+        if hasattr(self, "batch_executor"):
+            self.batch_executor.shutdown(wait=True)
+            logger.info("ThreadPoolExecutor for batch processing has been shut down")
 
 
 def create_modal_image():
@@ -388,28 +479,44 @@ def create_modal_image():
         modal.Image.debian_slim()
         .apt_install("libgl1-mesa-glx", "libglib2.0-0")
         .pip_install(
+            "accelerate",
+            "anthropic[bedrock,vertex]>=0.37.1",
+            "azure-identity",
+            "boto3>=1.28.57",
+            "dashscope",
+            "dill",
+            "easyocr",
+            "einops==0.8.0",
+            "fastapi>=0.109.0",
+            "google-auth<3,>=2",
+            "gradio",
+            "groq",
+            "httpx>=0.24.0",
+            "httpx>=0.24.0",
+            "jsonschema==4.22.0",
+            "numpy==1.26.4",
+            "openai==1.3.5",
+            "opencv-python-headless",
+            "opencv-python",
+            "paddleocr",
+            "paddlepaddle",
+            "pre-commit==3.8.0",
+            "pyautogui==0.9.54",
+            "pydantic==2.6.4",
+            "pytest-asyncio==0.23.6",
+            "pytest==8.3.3",
+            "python-multipart",
+            "ruff==0.6.7",
+            "screeninfo",
+            "streamlit>=1.38.0",
+            "supervision==0.18.0",
+            "timm",
             "torch",
             "torchvision",
             "transformers",
-            "accelerate",
-            "timm",
-            "einops==0.8.0",
-            "easyocr",
-            "supervision==0.18.0",
+            "uiautomation",
             "ultralytics==8.3.70",
-            "opencv-python",
-            "opencv-python-headless",
-            "paddlepaddle",
-            "paddleocr",
-            "gradio",
-            "streamlit>=1.38.0",
-            "fastapi>=0.109.0",
             "uvicorn>=0.27.0",
-            "httpx>=0.24.0",
-            "python-multipart",
-            "numpy==1.26.4",
-            "dill",
-            "jsonschema==4.22.0",
         )
         .copy_local_file(
             "weights/icon_detect/model.pt", "/root/weights/icon_detect/model.pt"
@@ -422,7 +529,6 @@ def create_modal_image():
 
 
 app = modal.App("omniparser", image=create_modal_image())
-
 
 @app.cls(
     gpu=ENV_CONFIG["MODAL_GPU_CONFIG"],
@@ -452,61 +558,67 @@ class ModalContainer:
             use_paddleocr=req.use_paddleocr,
             imgsz=req.imgsz,
         )
+
+        if "error" in result and result["error"]:
+            # Still return a valid ProcessResult, but with the error field populated
+            return ProcessResult(
+                processed_image="",
+                parsed_content="",
+                error=result["error"]
+            )
+
         return ProcessResult(**result)
 
     @modal.web_endpoint(method="POST")
     def process_batched(self, req: BatchProcessRequest) -> List[ProcessResult]:
-        """Process multiple images in a single request"""
+        """Process multiple images in a single request, in parallel"""
         batch_id = f"batch_{str(uuid.uuid4())[:8]}"
-        logger.info(f"[{batch_id}] Processing batch of {len(req.images)} images")
-
-        results = []
-        for idx, image_data in enumerate(req.images):
-            logger.info(f"[{batch_id}] Processing image {idx+1}/{len(req.images)}")
-            result = self.omniparser.process_image(
-                image_data=image_data,
-                box_threshold=req.box_threshold,
-                iou_threshold=req.iou_threshold,
-                use_paddleocr=req.use_paddleocr,
-                imgsz=req.imgsz,
-            )
-            results.append(ProcessResult(**result))
-
-            # If an error occurred, log it but continue processing the batch
-            if "error" in result and result["error"]:
-                logger.warning(
-                    f"[{batch_id}] Error processing image {idx+1}: {result['error']}"
-                )
-
-        logger.info(f"[{batch_id}] Batch processing complete")
-        return results
+        return self.omniparser.process_batch(
+            batch_id=batch_id,
+            images=req.images,
+            box_threshold=req.box_threshold,
+            iou_threshold=req.iou_threshold,
+            use_paddleocr=req.use_paddleocr,
+            imgsz=req.imgsz,
+        )
 
 
 class FastApiOmniParser:
-    """FastAPI implementation for local deployment of OmniParser."""
+    """
+    FastAPI server wrapper for OmniParser.
+    """
 
     def __init__(self):
-        """Initialize the FastAPI server with OmniParser instance"""
+        """Initialize the FastAPI server."""
         self.omniparser = OmniParser()
         
-        # Define lifespan context manager
+        # Create a reference to self for use in the context manager
+        omniparser_instance = self.omniparser
+        
+        # Create an asynccontextmanager for lifespan
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             # Startup: initialize models
             logger.info("Initializing models for FastAPI server...")
-            self.omniparser.init_models()
-            yield
-            # Shutdown: cleanup if needed
-            logger.info("Shutting down FastAPI server...")
-        
+            omniparser_instance.init_models()
+            try:
+                yield
+            except Exception as e:
+                logger.error(f"Error during startup: {str(e)}")
+            finally:
+                # Shutdown: cleanup if needed
+                logger.info("Shutting down FastAPI server...")
+                # Make sure to shut down the ThreadPoolExecutor
+                omniparser_instance.batch_executor.shutdown(wait=True)
+
         # Create FastAPI app with lifespan
         self.api = FastAPI(
             title="OmniParser API",
             description="API for parsing UI screens",
             version="1.0.0",
-            lifespan=lifespan
+            lifespan=lifespan,
         )
-        
+
         self._setup_routes()
         logger.info("FastAPI server initialized")
 
@@ -533,31 +645,23 @@ class FastApiOmniParser:
         async def process_batched(
             req: BatchProcessRequest, background_tasks: BackgroundTasks
         ):
-            """Process multiple images in a single request"""
+            """Process multiple images in a single request, in parallel"""
             batch_id = f"batch_{str(uuid.uuid4())[:8]}"
-            logger.info(f"[{batch_id}] Processing batch of {len(req.images)} images")
+            return self.omniparser.process_batch(
+                batch_id=batch_id,
+                images=req.images,
+                box_threshold=req.box_threshold,
+                iou_threshold=req.iou_threshold,
+                use_paddleocr=req.use_paddleocr,
+                imgsz=req.imgsz,
+            )
 
-            results = []
-            for idx, image_data in enumerate(req.images):
-                logger.info(f"[{batch_id}] Processing image {idx+1}/{len(req.images)}")
-                result = self.omniparser.process_image(
-                    image_data=image_data,
-                    box_threshold=req.box_threshold,
-                    iou_threshold=req.iou_threshold,
-                    use_paddleocr=req.use_paddleocr,
-                    imgsz=req.imgsz,
-                )
-                results.append(ProcessResult(**result))
-
-                # If an error occurred, log it but continue processing the batch
-                if "error" in result and result["error"]:
-                    logger.warning(
-                        f"[{batch_id}] Error processing image {idx+1}: {result['error']}"
-                    )
-
-            logger.info(f"[{batch_id}] Batch processing complete")
-            return results
-
+        # API health check endpoint
+        @self.api.get("/health")
+        async def health_check():
+            """Health check endpoint to verify API is operational"""
+            return {"status": "healthy", "version": "1.0.0"}
+            
         # Add CORS middleware to allow cross-origin requests
         self.api.add_middleware(
             CORSMiddleware,
@@ -572,6 +676,14 @@ class FastApiOmniParser:
         port = port or ENV_CONFIG["API_PORT"]
         logger.info(f"Starting FastAPI server on {host}:{port}")
         uvicorn.run(self.api, host=host, port=port, log_level="info")
+
+
+def teardown_resources():
+    """Shutdown any active resources."""
+    # This function is called when the process is terminated
+    # We don't have a global omniparser instance, so this function is a no-op
+    logger.info("Teardown resources called, but no global resources to clean up")
+    pass
 
 
 if __name__ == "__main__":

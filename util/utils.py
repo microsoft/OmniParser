@@ -3,46 +3,41 @@ import os
 import io
 import base64
 import time
-from PIL import Image, ImageDraw, ImageFont
-import json
-import requests
-# utility function
+from PIL import Image
 import os
-from openai import AzureOpenAI
-
-import json
-import sys
 import os
 import cv2
 import numpy as np
 # %matplotlib inline
 from matplotlib import pyplot as plt
 import easyocr
-from paddleocr import PaddleOCR
-reader = easyocr.Reader(['en'])
-paddle_ocr = PaddleOCR(
-    lang='en',  # other lang also available
-    use_angle_cls=False,
-    use_gpu=False,  # using cuda will conflict with pytorch in the same process
-    show_log=False,
-    max_batch_size=1024,
-    use_dilation=True,  # improves accuracy
-    det_db_score_mode='slow',  # improves accuracy
-    rec_batch_num=1024)
+from util.paddle_ocr_pool import PaddleOCRPool
 import time
 import base64
-
 import os
-import ast
 import torch
 from typing import Tuple, List, Union
 from torchvision.ops import box_convert
-import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
 from util.box_annotator import BoxAnnotator 
+import os
 
+reader = easyocr.Reader(['en'])
+
+# Create a thread-safe pool of PaddleOCR instances
+paddle_ocr_pool = PaddleOCRPool(
+    pool_size=max(1, min(16, os.cpu_count() or 1)),  # Set pool size based on CPU cores
+    lang='en',
+    use_angle_cls=False,
+    use_gpu=True,  # using cuda will conflict with pytorch in the same process
+    show_log=False,
+    max_batch_size=1024,
+    use_dilation=True,  # improves accuracy
+    det_db_score_mode='slow',  # improves accuracy
+    rec_batch_num=1024
+)
 
 def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
     if not device:
@@ -385,12 +380,14 @@ def predict_yolo(model, image, box_threshold, imgsz, scale_img, iou_threshold=0.
         conf=box_threshold,
         imgsz=imgsz,
         iou=iou_threshold, # default 0.7
+        verbose=False,
         )
     else:
         result = model.predict(
         source=image,
         conf=box_threshold,
         iou=iou_threshold, # default 0.7
+        verbose=False,
         )
     boxes = result[0].boxes.xyxy#.tolist() # in pixel space
     conf = result[0].boxes.conf
@@ -428,7 +425,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
         ocr_bbox = torch.tensor(ocr_bbox) / torch.Tensor([w, h, w, h])
         ocr_bbox=ocr_bbox.tolist()
     else:
-        print('no ocr bbox!!!')
+        # print('no ocr bbox!!!')
         ocr_bbox = None
 
     ocr_bbox_elem = [{'type': 'text', 'bbox':box, 'interactivity':False, 'content':txt, 'source': 'box_ocr_content_ocr'} for box, txt in zip(ocr_bbox, ocr_text) if int_box_area(box, w, h) > 0] 
@@ -440,7 +437,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     # get the index of the first 'content': None
     starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
-    print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
+    # print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
     # get parsed icon local semantics
     time1 = time.time()
@@ -463,7 +460,7 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     else:
         ocr_text = [f"Text Box ID {i}: {txt}" for i, txt in enumerate(ocr_text)]
         parsed_content_merged = ocr_text
-    print('time to get parsed content:', time.time()-time1)
+    # print('time to get parsed content:', time.time()-time1)
 
     filtered_boxes = box_convert(boxes=filtered_boxes, in_fmt="xyxy", out_fmt="cxcywh")
 
@@ -514,7 +511,8 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             text_threshold = 0.5
         else:
             text_threshold = easyocr_args['text_threshold']
-        result = paddle_ocr.ocr(image_np, cls=False)[0]
+        # Use the thread-safe PaddleOCRPool instead of a single instance
+        result = paddle_ocr_pool.process_image(image_np, cls=False)[0]
         coord = [item[0] for item in result if item[1][1] > text_threshold]
         text = [item[1][0] for item in result if item[1][1] > text_threshold]
     else:  # EasyOCR
