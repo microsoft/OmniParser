@@ -11,7 +11,6 @@ from typing import Dict, List, Optional, Any
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import multiprocessing
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,6 +60,7 @@ ENV_CONFIG = {
         os.environ.get("THREAD_POOL_SIZE", str(DEFAULT_THREAD_POOL_SIZE))
     ),
 }
+
 
 def setup_logging():
     """Configure and return a logger with custom formatting and stream handlers."""
@@ -239,11 +239,13 @@ class BatchProcessRequest(BaseModel):
             if not img.startswith("data:image"):
                 raise ValueError("All image data must begin with 'data:image' prefix")
         return v
-        
-    @model_validator(mode='after')
+
+    @model_validator(mode="after")
     def validate_batch_size(self):
         if len(self.images) > ENV_CONFIG["MAX_BATCH_SIZE"]:
-            raise ValueError(f"Batch size exceeds maximum allowed ({ENV_CONFIG['MAX_BATCH_SIZE']})")
+            raise ValueError(
+                f"Batch size exceeds maximum allowed ({ENV_CONFIG['MAX_BATCH_SIZE']})"
+            )
         return self
 
 
@@ -267,8 +269,12 @@ class OmniParser:
         self.yolo_model = None
         self.caption_model_processor = None
         self.models_initialized = False
-        self.batch_executor = ThreadPoolExecutor(max_workers=ENV_CONFIG["THREAD_POOL_SIZE"])
-        logger.info(f"Initialized ThreadPoolExecutor for batch processing ({ENV_CONFIG['THREAD_POOL_SIZE']} workers)")
+        self.batch_executor = ThreadPoolExecutor(
+            max_workers=ENV_CONFIG["THREAD_POOL_SIZE"]
+        )
+        logger.info(
+            f"Initialized ThreadPoolExecutor for batch processing ({ENV_CONFIG['THREAD_POOL_SIZE']} workers)"
+        )
 
     def init_models(self):
         """Initialize and load the ML models."""
@@ -399,7 +405,7 @@ class OmniParser:
                 "parsed_content": "",
                 "error": error_msg,
             }
-    
+
     def process_batch(
         self,
         batch_id: str,
@@ -411,7 +417,7 @@ class OmniParser:
     ) -> List[ProcessResult]:
         """
         Process multiple images in parallel.
-        
+
         Args:
             batch_id: Unique identifier for this batch
             images: List of base64 encoded image strings
@@ -419,22 +425,26 @@ class OmniParser:
             iou_threshold: IOU threshold for non-maximum suppression
             use_paddleocr: Whether to use PaddleOCR for text detection
             imgsz: Image size for processing
-            
+
         Returns:
             List of ProcessResult objects, one for each input image
         """
-        logger.info(f"[{batch_id}] Processing batch of {len(images)} images in parallel")
-        
+        logger.info(
+            f"[{batch_id}] Processing batch of {len(images)} images in parallel"
+        )
+
         # Ensure models are initialized
         if not self.models_initialized:
             self.init_models()
-            
+
         # Submit all image processing tasks to the executor
         futures_to_indices = {}
         start_times = {}  # Track when each task actually starts processing
 
         for idx, image_data in enumerate(images):
-            logger.info(f"[{batch_id}] Submitting image {idx+1}/{len(images)} for processing")
+            logger.info(
+                f"[{batch_id}] Submitting image {idx+1}/{len(images)} for processing"
+            )
             future = self.batch_executor.submit(
                 self.process_image,
                 image_data=image_data,
@@ -451,7 +461,7 @@ class OmniParser:
             ProcessResult(processed_image="", parsed_content="")
             for _ in range(len(images))
         ]
-        
+
         # Collect results as they complete
         start_time = time.time()
         successful_count = 0
@@ -464,11 +474,13 @@ class OmniParser:
                 # Calculate the total processing time for this image from submission to completion
                 image_processing_time = time.time() - start_times[idx]
                 processing_times.append(image_processing_time)
-                
+
                 result = future.result()
                 results[idx] = ProcessResult(**result)
                 successful_count += 1
-                logger.info(f"[{batch_id}] Completed processing image {idx+1}/{len(images)} in {image_processing_time:.2f}s")
+                logger.info(
+                    f"[{batch_id}] Completed processing image {idx+1}/{len(images)} in {image_processing_time:.2f}s"
+                )
             except Exception as e:
                 error_msg = f"Error processing image {idx+1}: {str(e)}"
                 logger.warning(f"[{batch_id}] {error_msg}")
@@ -478,8 +490,10 @@ class OmniParser:
                 )
 
         processing_time = time.time() - start_time
-        avg_time = processing_time/len(images) if images else 0
-        avg_per_img = sum(processing_times)/len(processing_times) if processing_times else 0
+        avg_time = processing_time / len(images) if images else 0
+        avg_per_img = (
+            sum(processing_times) / len(processing_times) if processing_times else 0
+        )
         max_time = max(processing_times) if processing_times else 0
         min_time = min(processing_times) if processing_times else 0
         pool_size = ENV_CONFIG["THREAD_POOL_SIZE"]
@@ -488,7 +502,9 @@ class OmniParser:
         total_processing_time = sum(processing_times)
         if processing_time > 0 and total_processing_time > 0:
             # True parallelism efficiency: ratio of total sequential time to actual time taken
-            parallelism_efficiency = min(1.0, total_processing_time / (processing_time * pool_size))
+            parallelism_efficiency = min(
+                1.0, total_processing_time / (processing_time * pool_size)
+            )
         else:
             parallelism_efficiency = 0
 
@@ -498,18 +514,31 @@ class OmniParser:
 
         # Thread pool size suggestions
         if parallelism_efficiency < 0.5 and pool_size > 2:
-            pool_suggestion = f" Consider reducing THREAD_POOL_SIZE (current: {pool_size})"
+            pool_suggestion = (
+                f" Consider reducing THREAD_POOL_SIZE (current: {pool_size})"
+            )
         elif parallelism_efficiency > 0.9 and failed_count == 0:
-            pool_suggestion = f" Consider increasing THREAD_POOL_SIZE (current: {pool_size})"
+            pool_suggestion = (
+                f" Consider increasing THREAD_POOL_SIZE (current: {pool_size})"
+            )
 
         # Batch size suggestions based on processing characteristics
         current_batch_size = len(images)
-        if failed_count > 0 and (failed_count / current_batch_size) > 0.1:  # >10% failure rate
-            batch_suggestion = f" | Consider reducing batch size (current: {current_batch_size})"
+        if (
+            failed_count > 0 and (failed_count / current_batch_size) > 0.1
+        ):  # >10% failure rate
+            batch_suggestion = (
+                f" | Consider reducing batch size (current: {current_batch_size})"
+            )
         elif max_time > 2.5 * avg_per_img and current_batch_size > 5:
             # High variance in processing times may indicate resource contention
             batch_suggestion = f" | Consider reducing batch size to improve consistency (current: {current_batch_size})"
-        elif max_time < 1.5 * avg_per_img and parallelism_efficiency > 0.8 and failed_count == 0 and current_batch_size < ENV_CONFIG["MAX_BATCH_SIZE"] // 2:
+        elif (
+            max_time < 1.5 * avg_per_img
+            and parallelism_efficiency > 0.8
+            and failed_count == 0
+            and current_batch_size < ENV_CONFIG["MAX_BATCH_SIZE"] // 2
+        ):
             # Stable processing with good parallelism suggests batch size can be increased
             batch_suggestion = f" | Consider increasing batch size for better throughput (current: {current_batch_size})"
 
@@ -588,6 +617,7 @@ def create_modal_image():
 
 app = modal.App("omniparser", image=create_modal_image())
 
+
 @app.cls(
     gpu=ENV_CONFIG["MODAL_GPU_CONFIG"],
     container_idle_timeout=ENV_CONFIG["MODAL_CONTAINER_TIMEOUT"],
@@ -620,9 +650,7 @@ class ModalContainer:
         if "error" in result and result["error"]:
             # Still return a valid ProcessResult, but with the error field populated
             return ProcessResult(
-                processed_image="",
-                parsed_content="",
-                error=result["error"]
+                processed_image="", parsed_content="", error=result["error"]
             )
 
         return ProcessResult(**result)
@@ -649,10 +677,10 @@ class FastApiOmniParser:
     def __init__(self):
         """Initialize the FastAPI server."""
         self.omniparser = OmniParser()
-        
+
         # Create a reference to self for use in the context manager
         omniparser_instance = self.omniparser
-        
+
         # Create an asynccontextmanager for lifespan
         @asynccontextmanager
         async def lifespan(app: FastAPI):
@@ -713,7 +741,7 @@ class FastApiOmniParser:
                 use_paddleocr=req.use_paddleocr,
                 imgsz=req.imgsz,
             )
-            
+
         # Add CORS middleware to allow cross-origin requests
         self.api.add_middleware(
             CORSMiddleware,

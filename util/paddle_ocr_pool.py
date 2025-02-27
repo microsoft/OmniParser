@@ -3,6 +3,7 @@ from queue import Queue
 from concurrent.futures import ThreadPoolExecutor
 from paddleocr import PaddleOCR
 
+
 class PaddleOCRPool:
     """
     A thread-safe pool of PaddleOCR instances.
@@ -69,8 +70,8 @@ class PaddleOCRPool:
             self.usage_metrics["total_requests"] += 1
             self.usage_metrics["current_in_use"] += 1
             self.usage_metrics["max_concurrent"] = max(
-                self.usage_metrics["max_concurrent"], 
-                self.usage_metrics["current_in_use"]
+                self.usage_metrics["max_concurrent"],
+                self.usage_metrics["current_in_use"],
             )
         return self.ocr_queue.get()
 
@@ -123,77 +124,79 @@ class PaddleOCRPool:
     def get_utilization(self):
         """
         Get statistics about pool utilization.
-        
+
         Returns:
             dict: Pool utilization statistics
         """
         with self.access_lock:
             metrics = dict(self.usage_metrics)
             metrics["available"] = self.ocr_queue.qsize()
-            
+
             # Convert float calculations to integers to avoid type errors
             utilization_pct = (
-                100 * (self.pool_size - metrics["available"]) / self.pool_size 
-                if self.pool_size > 0 else 0
+                100 * (self.pool_size - metrics["available"]) / self.pool_size
+                if self.pool_size > 0
+                else 0
             )
             max_utilization_pct = (
-                100 * metrics["max_concurrent"] / self.pool_size 
-                if self.pool_size > 0 else 0
+                100 * metrics["max_concurrent"] / self.pool_size
+                if self.pool_size > 0
+                else 0
             )
-            
+
             # Set calculated metrics
             metrics["utilization_pct"] = int(utilization_pct)
             metrics["max_utilization_pct"] = int(max_utilization_pct)
-            
+
             # Add batch size info as separate keys instead of nested dict
             metrics["max_batch_size"] = self.ocr_params.get("max_batch_size", 1024)
             metrics["rec_batch_num"] = self.ocr_params.get("rec_batch_num", 1024)
-            
+
             return metrics
 
     def update_batch_sizes(self, max_batch_size=None, rec_batch_num=None):
         """
         Update batch size parameters for OCR processing.
         This doesn't affect currently running instances, only future ones.
-        
+
         Args:
             max_batch_size: New max batch size value
             rec_batch_num: New recognition batch number value
-            
+
         Returns:
             dict: Updated batch size parameters
         """
         with self.access_lock:
             if max_batch_size is not None:
                 self.ocr_params["max_batch_size"] = max_batch_size
-            
+
             if rec_batch_num is not None:
                 self.ocr_params["rec_batch_num"] = rec_batch_num
-            
+
             return {
                 "max_batch_size": self.ocr_params["max_batch_size"],
-                "rec_batch_num": self.ocr_params["rec_batch_num"]
+                "rec_batch_num": self.ocr_params["rec_batch_num"],
             }
 
     def reset_metrics(self):
         """
         Reset the usage metrics while preserving the current state.
         This is useful for starting a new monitoring session.
-        
+
         Returns:
             dict: Previous metrics before reset
         """
         with self.access_lock:
             current_metrics = dict(self.usage_metrics)
             current_in_use = self.usage_metrics["current_in_use"]
-            
+
             # Reset metrics but keep current_in_use accurate
             self.usage_metrics = {
                 "total_requests": 0,
                 "max_concurrent": current_in_use,
-                "current_in_use": current_in_use
+                "current_in_use": current_in_use,
             }
-            
+
             return current_metrics
 
     def __del__(self):
