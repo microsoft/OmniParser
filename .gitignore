@@ -12,3 +12,4 @@ tmp/
 wget-log
 weights/icon_caption_florence_v2/
 venv/
+*.bat

@@ -1,3 +1,4 @@
+import os
 import requests
 import base64
 from pathlib import Path
@@ -10,9 +11,10 @@ class OmniParserClient:
     def __init__(self, 
                  url: str) -> None:
         self.url = url
+        self.use_vm = (os.getenv("OMNIPARSER_NO_VM", "False") == "False")
 
     def __call__(self,):
-        screenshot, screenshot_path = get_screenshot()
+        screenshot, screenshot_path = get_screenshot(using_vm = self.use_vm)
         screenshot_path = str(screenshot_path)
         image_base64 = encode_image(screenshot_path)
         response = requests.post(self.url, json={"base64_image": image_base64})

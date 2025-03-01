@@ -31,16 +31,17 @@ OmniParser lets you turn any vision-langauge model into an AI agent. We currentl
 
 Type a message and press submit to start OmniTool. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
+args = None
 
 def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Gradio App")
     parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
     parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
-    parser.add_argument("--no_vm", action='store_true', help='Run omniparser on local machine without a virtual windows machine'))
+    parser.add_argument("--no_vm", action='store_true', help='Run omniparser on local machine without a virtual windows machine')
     return parser.parse_args()
 args = parse_arguments()
-
+os.environ["OMNIPARSER_NO_VM"] = str(args.no_vm) 
 
 class Sender(StrEnum):
     USER = "user"
