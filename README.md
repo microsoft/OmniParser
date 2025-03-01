@@ -29,6 +29,8 @@ conda create -n "omni" python==3.12
 conda activate omni
 pip install -r requirements.txt
 ```
+If you have an nvidia gpu with cuda toolkit 12.4 installed, use pip install -r requirements_gpu.txt instead to enable gpu support.  You can modify the requirements_gpu for your cuda version if you have a version other than 12.4.
+
 
 Ensure you have the V2 weights downloaded in weights folder (ensure caption weights folder is called icon_caption_florence). If not download them with:
 ```
@@ -48,6 +50,7 @@ python weights/convert_safetensor_to_pt.py
 For v1.5: 
 download 'model_v1_5.pt' from https://huggingface.co/microsoft/OmniParser/tree/main/icon_detect_v1_5, make a new dir: weights/icon_detect_v1_5, and put it inside the folder. No weight conversion is needed. 
 ``` -->
+If you have a windows machine you can run weights_download.ps1 from a powershell terminal inside of the root of the project instead to download the model weights.
 
 ## Examples:
 We put together a few simple examples in the demo.ipynb. 
@@ -56,6 +59,20 @@ We put together a few simple examples in the demo.ipynb.
 To run gradio demo, simply run:
 ```python
 python gradio_demo.py
+```
+
+## Webui App
+To run the web ui app demo, run:
+```python
+python omnitool/gradio/app.py
+```
+You can use the command line argument --no_vm to run the webui actions on your local computer rather than in a windows virtual machine:
+```python
+python omnitool/gradio/app.py --no_vm
+```
+Remember for either option you have to start the omniparserserver first before running the web app:
+```python
+python omnitool/omniparserserver/omniparserserver.py
 ```
 
 ## Model Weights License
