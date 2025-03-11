@@ -7,7 +7,7 @@ from PIL import Image
 import io
 
 
-import base64, os
+import base64, json, os
 from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
@@ -54,9 +54,11 @@ def process(
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_input, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz,)  
     image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
     print('finish processing')
-    parsed_content_list = '\n'.join([f'icon {i}: ' + str(v) for i,v in enumerate(parsed_content_list)])
-    # parsed_content_list = str(parsed_content_list)
-    return image, str(parsed_content_list)
+    parsed_content = json.dumps({
+        "parsed_content_list": parsed_content_list,
+        "label_coordinates": label_coordinates,
+    }, indent=2)
+    return image, parsed_content
 
 with gr.Blocks() as demo:
     gr.Markdown(MARKDOWN)

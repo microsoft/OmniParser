@@ -22,6 +22,19 @@
 - [2024/10] Both Interactive Region Detection Model and Icon functional description model are released! [Hugginface models](https://huggingface.co/microsoft/OmniParser)
 - [2024/09] OmniParser achieves the best performance on [Windows Agent Arena](https://microsoft.github.io/WindowsAgentArena/)! 
 
+### :rocket: Docker Quick Start
+
+Prerequisites:
+- CUDA-enabled GPU
+- NVIDIA Container Toolkit installed (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+```
+# Build the image (requires CUDA)
+sudo docker build -t omniparser .
+
+# Run the image
+sudo docker run -d -p 7861:7861 --gpus all --name omniparser-container omniparser
+```
+
 ## Install 
 First clone the repo, and then install environment:
 ```python
@@ -43,6 +56,7 @@ Then download the model ckpts files in: https://huggingface.co/microsoft/OmniPar
 
 For v1: 
 convert the safetensor to .pt file. 
+
 ```python
 python weights/convert_safetensor_to_pt.py
 
@@ -58,6 +72,13 @@ To run gradio demo, simply run:
 ```python
 python gradio_demo.py
 ```
+
+## Deploy to AWS
+
+To deploy OmniParser to EC2 on AWS via Github Actions:
+
+1. Fork this repository and clone your fork to your local machine.
+2. Follow the instructions at the top of [`deploy.py`](https://github.com/microsoft/OmniParser/blob/main/deploy.py).
 
 ## Model Weights License
 For the model checkpoints on huggingface model hub, please note that icon_detect model is under AGPL license since it is a license inherited from the original yolo model. And icon_caption_blip2 & icon_caption_florence is under MIT license. Please refer to the LICENSE file in the folder of each model: https://huggingface.co/microsoft/OmniParser.
