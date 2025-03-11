@@ -302,7 +302,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             with gr.Column():
                 model = gr.Dropdown(
                     label="Model",
-                    choices=["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022"],
+                    choices=["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"],
                     value="omniparser + gpt-4o",
                     interactive=True,
                 )
@@ -341,7 +341,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             stop_button = gr.Button(value="Stop", variant="secondary")
 
     with gr.Row():
-        with gr.Column(scale=1):
+        with gr.Column(scale=2):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
         with gr.Column(scale=3):
             iframe = gr.HTML(
@@ -356,7 +356,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         
         if model_selection == "claude-3-5-sonnet-20241022":
             provider_choices = [option.value for option in APIProvider if option.value != "openai"]
-        elif model_selection in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini"]):
+        elif model_selection in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated"]):
             provider_choices = ["openai"]
         elif model_selection == "omniparser + R1":
             provider_choices = ["groq"]
