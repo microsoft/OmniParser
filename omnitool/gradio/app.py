@@ -31,15 +31,17 @@ OmniParser lets you turn any vision-langauge model into an AI agent. We currentl
 
 Type a message and press submit to start OmniTool. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
+args = None
 
 def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Gradio App")
     parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
     parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
+    parser.add_argument("--no_vm", action='store_true', help='Run omniparser on local machine without a virtual windows machine')
     return parser.parse_args()
 args = parse_arguments()
-
+os.environ["OMNIPARSER_NO_VM"] = str(args.no_vm) 
 
 class Sender(StrEnum):
     USER = "user"
@@ -195,8 +197,13 @@ def valid_params(user_input, state):
             url = f'http://{url}/probe'
             response = requests.get(url, timeout=3)
             if response.status_code != 200:
-                errors.append(f"{server_name} is not responding")
+                # Throw error if either the OmniParser server does not respond or the Windows VM does not respond and the user has not selected the no_vm command line argument
+                if server_name == 'OmniParser Server' or (server_name == 'Windows Host' and not args.no_vm):
+                    errors.append(f"{server_name} is not responding")
         except RequestException as e:
+            # Skip error handling if server is Windows VM but user has selected no_vm command line argument
+            if server_name == 'Windows Host' and args.no_vm:
+                continue
             errors.append(f"{server_name} is not responding")
     
     if not state["api_key"].strip():

@@ -1,3 +1,4 @@
+import os
 import base64
 import time
 from enum import StrEnum
@@ -11,11 +12,14 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from .screen_capture import get_screenshot
 import requests
 import re
+import pyautogui
 
 OUTPUT_DIR = "./tmp/outputs"
 
 TYPING_DELAY_MS = 12
 TYPING_GROUP_SIZE = 50
+
+use_vm: bool = True
 
 Action = Literal[
     "key",
@@ -90,13 +94,15 @@ class ComputerTool(BaseAnthropicTool):
 
     def __init__(self, is_scaling: bool = False):
         super().__init__()
-
+        global use_vm
+        use_vm = (os.getenv("OMNIPARSER_NO_VM", "False") == "False")
         # Get screen width and height using Windows command
         self.display_num = None
         self.offset_x = 0
         self.offset_y = 0
         self.is_scaling = is_scaling
         self.width, self.height = self.get_screen_size()
+
         print(f"screen size: {self.width}, {self.height}")
 
         self.key_conversion = {"Page_Down": "pagedown",
@@ -141,11 +147,18 @@ class ComputerTool(BaseAnthropicTool):
             print(f"mouse move to {x}, {y}")
             
             if action == "mouse_move":
-                self.send_to_vm(f"pyautogui.moveTo({x}, {y})")
+                if use_vm:
+                    self.send_to_vm(f"pyautogui.moveTo({x}, {y})")
+                else:
+                    pyautogui.moveTo(x, y)
                 return ToolResult(output=f"Moved mouse to ({x}, {y})")
             elif action == "left_click_drag":
-                current_x, current_y = self.send_to_vm("pyautogui.position()")
-                self.send_to_vm(f"pyautogui.dragTo({x}, {y}, duration=0.5)")
+                if use_vm:
+                    current_x, current_y = self.send_to_vm("pyautogui.position()")
+                    self.send_to_vm(f"pyautogui.dragTo({x}, {y}, duration=0.5)")
+                else:
+                    current_x, current_y = pyautogui.position()
+                    pyautogui.dragTo(x, y, duration=0.5) 
                 return ToolResult(output=f"Dragged mouse from ({current_x}, {current_y}) to ({x}, {y})")
 
         if action in ("key", "type"):
@@ -162,19 +175,31 @@ class ComputerTool(BaseAnthropicTool):
                 for key in keys:
                     key = self.key_conversion.get(key.strip(), key.strip())
                     key = key.lower()
-                    self.send_to_vm(f"pyautogui.keyDown('{key}')")  # Press down each key
+                    if use_vm:
+                        self.send_to_vm(f"pyautogui.keyDown('{key}')")  # Press down each key
+                    else:
+                        pyautogui.keyDown(key)
                 for key in reversed(keys):
                     key = self.key_conversion.get(key.strip(), key.strip())
                     key = key.lower()
-                    self.send_to_vm(f"pyautogui.keyUp('{key}')")    # Release each key in reverse order
+                    if use_vm:
+                        self.send_to_vm(f"pyautogui.keyUp('{key}')")    # Release each key in reverse order
+                    else:
+                        pyautogui.keyUp(key)
                 return ToolResult(output=f"Pressed keys: {text}")
             
             elif action == "type":
                 # default click before type TODO: check if this is needed
-                self.send_to_vm("pyautogui.click()")
-                self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
-                self.send_to_vm("pyautogui.press('enter')")
-                screenshot_base64 = (await self.screenshot()).base64_image
+                if use_vm:
+                    self.send_to_vm("pyautogui.click()")
+                    self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
+                    self.send_to_vm("pyautogui.press('enter')")
+                else:
+                    pyautogui.click()
+                    pyautogui.typewrite(text, interval=(TYPING_DELAY_MS/1000))
+                    pyautogui.press('enter')
+                screenshot = await self.screenshot()
+                screenshot_base64 = screenshot.base64_image
                 return ToolResult(output=text, base64_image=screenshot_base64)
 
         if action in (
@@ -194,28 +219,54 @@ class ComputerTool(BaseAnthropicTool):
             if action == "screenshot":
                 return await self.screenshot()
             elif action == "cursor_position":
-                x, y = self.send_to_vm("pyautogui.position()")
-                x, y = self.scale_coordinates(ScalingSource.COMPUTER, x, y)
+                if use_vm:
+                    x, y = self.send_to_vm("pyautogui.position()")
+                    x, y = self.scale_coordinates(ScalingSource.COMPUTER, x, y)
+                else:
+                    x, y = pyautogui.position()
                 return ToolResult(output=f"X={x},Y={y}")
             else:
                 if action == "left_click":
-                    self.send_to_vm("pyautogui.click()")
+                    if use_vm:
+                        self.send_to_vm("pyautogui.click()")
+                    else:
+                        pyautogui.click()
                 elif action == "right_click":
-                    self.send_to_vm("pyautogui.rightClick()")
+                    if use_vm:
+                        self.send_to_vm("pyautogui.rightClick()")
+                    else:
+                        pyautogui.rightClick()
                 elif action == "middle_click":
-                    self.send_to_vm("pyautogui.middleClick()")
+                    if use_vm:
+                        self.send_to_vm("pyautogui.middleClick()")
+                    else:
+                        pyautogui.middleClick()
                 elif action == "double_click":
-                    self.send_to_vm("pyautogui.doubleClick()")
+                    if use_vm:
+                        self.send_to_vm("pyautogui.doubleClick()")
+                    else:
+                        pyautogui.doubleClick()
                 elif action == "left_press":
-                    self.send_to_vm("pyautogui.mouseDown()")
-                    time.sleep(1)
-                    self.send_to_vm("pyautogui.mouseUp()")
+                    if use_vm:
+                        self.send_to_vm("pyautogui.mouseDown()")
+                        time.sleep(1)
+                        self.send_to_vm("pyautogui.mouseUp()")
+                    else:
+                        pyautogui.mouseDown()
+                        time.sleep(1)
+                        pyautogui.mouseUp()
                 return ToolResult(output=f"Performed {action}")
         if action in ("scroll_up", "scroll_down"):
             if action == "scroll_up":
-                self.send_to_vm("pyautogui.scroll(100)")
+                if use_vm:
+                    self.send_to_vm("pyautogui.scroll(100)")
+                else:
+                    pyautogui.scroll(100)
             elif action == "scroll_down":
-                self.send_to_vm("pyautogui.scroll(-100)")
+                if use_vm:
+                    self.send_to_vm("pyautogui.scroll(-100)")
+                else:
+                    pyautogui.scroll(-100)
             return ToolResult(output=f"Performed {action}")
         if action == "hover":
             return ToolResult(output=f"Performed {action}")
@@ -261,7 +312,7 @@ class ComputerTool(BaseAnthropicTool):
             screenshot = self.padding_image(screenshot)
             self.target_dimension = MAX_SCALING_TARGETS["WXGA"]
         width, height = self.target_dimension["width"], self.target_dimension["height"]
-        screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height)
+        screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height, using_vm=use_vm)
         time.sleep(0.7) # avoid async error as actions take time to complete
         return ToolResult(base64_image=base64.b64encode(path.read_bytes()).decode())
 
@@ -310,20 +361,25 @@ class ComputerTool(BaseAnthropicTool):
     def get_screen_size(self):
         """Return width and height of the screen"""
         try:
-            response = requests.post(
-                f"http://localhost:5000/execute",
-                headers={'Content-Type': 'application/json'},
-                json={"command": ["python", "-c", "import pyautogui; print(pyautogui.size())"]},
-                timeout=90
-            )
-            if response.status_code != 200:
-                raise ToolError(f"Failed to get screen size. Status code: {response.status_code}")
-            
-            output = response.json()['output'].strip()
-            match = re.search(r'Size\(width=(\d+),\s*height=(\d+)\)', output)
-            if not match:
-                raise ToolError(f"Could not parse screen size from output: {output}")
-            width, height = map(int, match.groups())
-            return width, height
+            # Use VM to get screensize if using VM, otherwise use direct code
+            if use_vm:
+                response = requests.post(
+                    f"http://localhost:5000/execute",
+                    headers={'Content-Type': 'application/json'},
+                    json={"command": ["python", "-c", "import pyautogui; print(pyautogui.size())"]},
+                    timeout=90
+                )
+                if response.status_code != 200:
+                    raise ToolError(f"Failed to get screen size. Status code: {response.status_code}")
+                
+                output = response.json()['output'].strip()
+                match = re.search(r'Size\(width=(\d+),\s*height=(\d+)\)', output)
+                if not match:
+                    raise ToolError(f"Could not parse screen size from output: {output}")
+                width, height = map(int, match.groups())
+                return width, height
+            else:
+                width, height = pyautogui.size()
+                return width, height
         except requests.exceptions.RequestException as e:
             raise ToolError(f"An error occurred while trying to get screen size: {str(e)}")
