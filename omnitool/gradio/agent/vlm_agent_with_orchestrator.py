@@ -6,7 +6,8 @@ from PIL import Image, ImageDraw
 import base64
 from io import BytesIO
 import copy
-
+from pathlib import Path
+from datetime import datetime
 from anthropic import APIResponse
 from anthropic.types import ToolResultBlockParam
 from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, BetaMessageParam, BetaUsage
@@ -72,6 +73,7 @@ class VLMOrchestratedAgent:
         max_tokens: int = 4096,
         only_n_most_recent_images: int | None = None,
         print_usage: bool = True,
+        save_folder: str = "./uploads",
     ):
         if model == "omniparser + gpt-4o" or model == "omniparser + gpt-4o-orchestrated":
             self.model = "gpt-4o-2024-11-20"
@@ -93,6 +95,10 @@ class VLMOrchestratedAgent:
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
         self.output_callback = output_callback
+        self.save_folder = Path(save_folder).absolute()
+        
+        # Create save folder if it doesn't exist
+        self.save_folder.mkdir(parents=True, exist_ok=True)
 
         self.print_usage = print_usage
         self.total_token_usage = 0
@@ -102,7 +108,6 @@ class VLMOrchestratedAgent:
         self.system = ''
     
     def __call__(self, messages: list, parsed_screen: list[str, list, dict]):
-        # import pdb; pdb.set_trace()
         if self.step_count == 0:
             plan = self._initialize_task(messages)
             self.output_callback(f'-- Plan: {plan} --', sender="bot")
@@ -110,14 +115,21 @@ class VLMOrchestratedAgent:
             messages.append({"role": "assistant", "content": plan})
         else:
             updated_ledger = self._update_ledger(messages)
-            self.output_callback(f'-- Ledger: {updated_ledger} --', sender="bot")
+            self.output_callback(
+                f'<details>'
+                f'  <summary><strong>Task Progress Ledger (click to expand)</strong></summary>'
+                f'  <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-top: 5px;">'
+                f'    <pre>{updated_ledger}</pre>'
+                f'  </div>'
+                f'</details>',
+                sender="bot"
+            )
             # update messages with the ledger
             messages.append({"role": "assistant", "content": updated_ledger})
 
         self.step_count += 1
         image_base64 = parsed_screen['original_screenshot_base64']
         latency_omniparser = parsed_screen['latency']
-        self.output_callback(f'-- Step {self.step_count}: --', sender="bot")
         screen_info = str(parsed_screen['screen_info'])
         screenshot_uuid = parsed_screen['screenshot_uuid']
         screen_width, screen_height = parsed_screen['width'], parsed_screen['height']
@@ -182,7 +194,9 @@ class VLMOrchestratedAgent:
         else:
             raise ValueError(f"Model {self.model} not supported")
         latency_vlm = time.time() - start
-        self.output_callback(f"LLM: {latency_vlm:.2f}s, OmniParser: {latency_omniparser:.2f}s", sender="bot")
+        
+        # Update step counter with both latencies
+        self.output_callback(f'<i>Step {self.step_count} | OmniParser: {latency_omniparser:.2f}s | LLM: {latency_vlm:.2f}s</i>', sender="bot")
 
         print(f"{vlm_response}")
         
@@ -213,13 +227,18 @@ class VLMOrchestratedAgent:
                 print(f"Error parsing: {vlm_response_json}")
                 pass
         self.output_callback(f'<img src="data:image/png;base64,{img_to_show_base64}">', sender="bot")
+        
+        # Display screen info in a collapsible dropdown
         self.output_callback(
-                    f'<details>'
-                    f'  <summary>Parsed Screen elemetns by OmniParser</summary>'
-                    f'  <pre>{screen_info}</pre>'
-                    f'</details>',
-                    sender="bot"
-                )
+            f'<details>'
+            f'  <summary><strong>Parsed Screen Elements (click to expand)</strong></summary>'
+            f'  <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-top: 5px;">'
+            f'    <pre>{screen_info}</pre>'
+            f'  </div>'
+            f'</details>',
+            sender="bot"
+        )
+        
         vlm_plan_str = ""
         for key, value in vlm_response_json.items():
             if key == "Reasoning":
@@ -354,7 +373,21 @@ IMPORTANT NOTES:
                 provider_base_url="https://api.openai.com/v1",
                 temperature=0,
             )
-        plan = vlm_response
+        plan = extract_data(vlm_response, "json")
+        
+        # Create a filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        plan_filename = f"plan_{timestamp}.json"
+        plan_path = self.save_folder / plan_filename
+        
+        # Save the plan to a file
+        try:
+            with open(plan_path, "w") as f:
+                f.write(plan)
+            print(f"Plan successfully saved to {plan_path}")
+        except Exception as e:
+            print(f"Error saving plan to {plan_path}: {str(e)}")
+        
         return plan
 
     def _update_ledger(self, messages):
@@ -379,6 +412,13 @@ IMPORTANT NOTES:
     def _get_plan_prompt(self, task):
         plan_prompt = f"""
         please devise a short bullet-point plan for addressing the original user task: {task}
+        You should write your plan in a json dict, e.g:```json
+{{
+'step 1': xxx,
+'step 2': xxxx,
+...
+}}```
+        Now start your answer directly.
         """
         return plan_prompt
 
