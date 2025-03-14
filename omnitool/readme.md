@@ -88,6 +88,13 @@ There are three components:
 
    f. After creating the first time it will store a save of the VM state in `vm/win11storage`. You can then manage the VM with `./manage_vm.sh start` and `./manage_vm.sh stop`. To delete the VM, use `./manage_vm.sh delete` and delete the `OmniParser/omnitool/omnibox/vm/win11storage` directory.
 
+
+> [!note] You can now create and manage a Linux VM, use the script with commands like:
+> `./manage_vm.sh create --linux` to create a Linux VM
+> `./manage_vm.sh start --linux` to start a Linux VM
+> `./manage_vm.sh create` to create a Windows VM (default)
+> `./manage_vm.sh stop --windows` to explicitly stop a Windows VM
+
 3. **gradio**:
 
    a. Navigate to the gradio directory with `cd OmniParser/omnitool/gradio`
