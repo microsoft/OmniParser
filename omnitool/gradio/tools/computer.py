@@ -171,8 +171,14 @@ class ComputerTool(BaseAnthropicTool):
             
             elif action == "type":
                 # default click before type TODO: check if this is needed
-                self.send_to_vm("pyautogui.click()")
-                self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
+                if "\n" in text:
+                    self.send_to_vm(f"pyperclip.copy(base64.b64decode({base64.b64encode(text.encode('utf8'))}).decode('utf8'))")
+                    self.send_to_vm("pyautogui.keyDown('ctrl')")
+                    self.send_to_vm("pyautogui.press('v')")
+                    self.send_to_vm("pyautogui.keyUp('ctrl')")
+                else:
+                    self.send_to_vm("pyautogui.click()")
+                    self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
                 self.send_to_vm("pyautogui.press('enter')")
                 screenshot_base64 = (await self.screenshot()).base64_image
                 return ToolResult(output=text, base64_image=screenshot_base64)
@@ -228,7 +234,7 @@ class ComputerTool(BaseAnthropicTool):
         """
         Executes a python command on the server. Only return tuple of x,y when action is "pyautogui.position()"
         """
-        prefix = "import pyautogui; pyautogui.FAILSAFE = False;"
+        prefix = "import pyautogui; import pyperclip; import base64; pyautogui.FAILSAFE = False;"
         command_list = ["python", "-c", f"{prefix} {action}"]
         parse = action == "pyautogui.position()"
         if parse:
