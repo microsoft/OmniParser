@@ -623,7 +623,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         
         if model_selection == "claude-3-5-sonnet-20241022":
             provider_choices = [option.value for option in APIProvider if option.value != "openai"]
-        elif model_selection in set(["omniparser + gpt-4.5-preview","omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated"]):
+        elif model_selection in set(["omniparser + gpt-4.5-preview-orchestrated", "omniparser + gpt-4.5-preview","omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated"]):
             provider_choices = ["openai"]
         elif model_selection == "omniparser + R1":
             provider_choices = ["groq"]
