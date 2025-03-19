@@ -96,7 +96,7 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
 
     model, processor = caption_model_processor['model'], caption_model_processor['processor']
     if not prompt:
-        if 'florence' in model.config.name_or_path:
+        if 'florence' in model.config.name_or_path or 'florence' in model.config.model_type:
             prompt = "<CAPTION>"
         else:
             prompt = "The image shows"
@@ -111,7 +111,7 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt", do_resize=False).to(device=device, dtype=torch.float16)
         else:
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device)
-        if 'florence' in model.config.name_or_path:
+        if 'florence' in model.config.name_or_path or 'florence' in model.config.model_type:
             generated_ids = model.generate(input_ids=inputs["input_ids"],pixel_values=inputs["pixel_values"],max_new_tokens=20,num_beams=1, do_sample=False)
         else:
             generated_ids = model.generate(**inputs, max_length=100, num_beams=5, no_repeat_ngram_size=2, early_stopping=True, num_return_sequences=1) # temperature=0.01, do_sample=True,
