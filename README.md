@@ -4,6 +4,13 @@
   <img src="imgs/logo.png" alt="Logo">
 </p>
 
+<p align="center">
+[ <b>En</b> |
+<a href="docs/README_CN.md">中</a> |
+<a href="docs/README_FR.md">Fr</a> |
+<a href="docs/README_JA.md">日</a> ] 
+</p>
+
 [![arXiv](https://img.shields.io/badge/Paper-green)](https://arxiv.org/abs/2408.00203)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
