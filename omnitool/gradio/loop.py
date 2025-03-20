@@ -18,6 +18,7 @@ from tools import ToolResult
 from agent.llm_utils.omniparserclient import OmniParserClient
 from agent.anthropic_agent import AnthropicActor
 from agent.vlm_agent import VLMAgent
+from agent.vlm_agent_with_orchestrator import VLMOrchestratedAgent
 from executor.anthropic_executor import AnthropicExecutor
 
 BETA_FLAG = "computer-use-2024-10-22"
@@ -47,7 +48,8 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    omniparser_url: str
+    omniparser_url: str,
+    save_folder: str = "./uploads"
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
@@ -73,6 +75,17 @@ def sampling_loop_sync(
             output_callback=output_callback,
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
+        )
+    elif model in set(["omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"]):
+        actor = VLMOrchestratedAgent(
+            model=model,
+            provider=provider,
+            api_key=api_key,
+            api_response_callback=api_response_callback,
+            output_callback=output_callback,
+            max_tokens=max_tokens,
+            only_n_most_recent_images=only_n_most_recent_images,
+            save_folder=save_folder
         )
     else:
         raise ValueError(f"Model {model} not supported")
@@ -102,7 +115,7 @@ def sampling_loop_sync(
 
             messages.append({"content": tool_result_content, "role": "user"})
     
-    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl"]):
+    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"]):
         while True:
             parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)

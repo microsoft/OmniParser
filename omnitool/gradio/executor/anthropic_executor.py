@@ -53,7 +53,7 @@ class AnthropicExecutor:
                 tool_result_content.append(
                     _make_api_tool_result(result, content_block.id)
                 )
-                self.tool_output_callback(result, content_block.id)
+                # self.tool_output_callback(result, content_block.id)
 
             # Craft messages based on the content_block
             # Note: to display the messages in the gradio, you should organize the messages in the following way (user message, bot message)
