@@ -17,7 +17,7 @@ class Omniparser(object):
         image_bytes = base64.b64decode(image_base64)
         image = Image.open(io.BytesIO(image_bytes))
         print('image size:', image.size)
-        
+
         box_overlay_ratio = max(image.size) / 3200
         draw_bbox_config = {
             'text_scale': 0.8 * box_overlay_ratio,
@@ -26,7 +26,7 @@ class Omniparser(object):
             'thickness': max(int(3 * box_overlay_ratio), 1),
         }
 
-        (text, ocr_bbox), _ = check_ocr_box(image, display_img=False, output_bb_format='xyxy', easyocr_args={'text_threshold': 0.8}, use_paddleocr=False)
-        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image, self.som_model, BOX_TRESHOLD = self.config['BOX_TRESHOLD'], output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=self.caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.7, scale_img=False, batch_size=128)
+        (text, ocr_bbox), _ = check_ocr_box(image, display_img=False, output_bb_format='xyxy', easyocr_args={'text_threshold': 0.8, 'paragraph': True}, use_paddleocr=False)
+        dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image, self.som_model, BOX_TRESHOLD = self.config['BOX_TRESHOLD'], output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=self.caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.4, scale_img=False, batch_size=128)
 
-        return dino_labled_img, parsed_content_list
+        return dino_labled_img, parsed_content_list, image.size

@@ -27,11 +27,12 @@ MARKDOWN = """
 OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
 """
 
-DEVICE = torch.device('cuda')
+DEVICE = torch.device("mps")
+# DEVICE = torch.device('cuda')
 
 # @spaces.GPU
 # @torch.inference_mode()
-# @torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+# @torch.autocast(device_type="mps", dtype=torch.float16)
 def process(
     image_input,
     box_threshold,
@@ -52,7 +53,8 @@ def process(
     }
     # import pdb; pdb.set_trace()
 
-    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=use_paddleocr)
+    print("Start processing")
+    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_save_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': True, 'text_threshold':0.8}, use_paddleocr=use_paddleocr)
     text, ocr_bbox = ocr_bbox_rslt
     # print('prompt:', prompt)
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_save_path, yolo_model, BOX_TRESHOLD = box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,iou_threshold=iou_threshold, imgsz=imgsz,)  
