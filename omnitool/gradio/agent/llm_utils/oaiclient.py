@@ -123,11 +123,19 @@ def run_azure_oai_interleaved(
     elif isinstance(messages, str):
         final_messages = [{"role": "user", "content": messages}]
 
-    payload = {
-        "messages": final_messages,
-        "max_tokens": max_tokens,
-        "temperature": temperature
-    }
+    if 'gpt' in deployment_name:
+        payload = {
+            "messages": final_messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature
+        }
+    else:
+        payload = {
+            "model": deployment_name,
+            "messages": final_messages,
+            "max_completion_tokens": max_tokens,
+            # "temperature": temperature
+        }
 
     response = requests.post(
         f"{provider_base_url}/chat/completions?api-version={api_version}",
