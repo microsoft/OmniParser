@@ -17,7 +17,7 @@ from agent.llm_utils.groqclient import run_groq_interleaved
 from agent.llm_utils.utils import is_image_path
 import time
 import re
-
+import os
 OUTPUT_DIR = "./tmp/outputs"
 ORCHESTRATOR_LEDGER_PROMPT = """
 Recall we are working on the following request:
@@ -73,7 +73,7 @@ class VLMOrchestratedAgent:
         max_tokens: int = 4096,
         only_n_most_recent_images: int | None = None,
         print_usage: bool = True,
-        save_folder: str = "./uploads",
+        save_folder: str = None,
     ):
         if model == "omniparser + gpt-4o" or model == "omniparser + gpt-4o-orchestrated":
             self.model = "gpt-4o-2024-11-20"
@@ -95,22 +95,20 @@ class VLMOrchestratedAgent:
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
         self.output_callback = output_callback
-        self.save_folder = Path(save_folder).absolute()
+        self.save_folder = save_folder
         
-        # Create save folder if it doesn't exist
-        self.save_folder.mkdir(parents=True, exist_ok=True)
-
         self.print_usage = print_usage
         self.total_token_usage = 0
         self.total_cost = 0
         self.step_count = 0
+        self.plan, self.ledger = None, None
 
         self.system = ''
     
     def __call__(self, messages: list, parsed_screen: list[str, list, dict]):
         if self.step_count == 0:
             plan = self._initialize_task(messages)
-            self.output_callback(f'-- Plan: {plan} --', sender="bot")
+            self.output_callback(f'-- Plan: {plan} --', )
             # update messages with the plan
             messages.append({"role": "assistant", "content": plan})
         else:
@@ -122,13 +120,18 @@ class VLMOrchestratedAgent:
                 f'    <pre>{updated_ledger}</pre>'
                 f'  </div>'
                 f'</details>',
-                sender="bot"
             )
             # update messages with the ledger
             messages.append({"role": "assistant", "content": updated_ledger})
+            self.ledger = updated_ledger
 
         self.step_count += 1
-        image_base64 = parsed_screen['original_screenshot_base64']
+        # save the image to the output folder
+        with open(f"{self.save_folder}/screenshot_{self.step_count}.png", "wb") as f:
+            f.write(base64.b64decode(parsed_screen['original_screenshot_base64']))
+        with open(f"{self.save_folder}/som_screenshot_{self.step_count}.png", "wb") as f:
+            f.write(base64.b64decode(parsed_screen['som_image_base64']))
+
         latency_omniparser = parsed_screen['latency']
         screen_info = str(parsed_screen['screen_info'])
         screenshot_uuid = parsed_screen['screenshot_uuid']
@@ -196,7 +199,7 @@ class VLMOrchestratedAgent:
         latency_vlm = time.time() - start
         
         # Update step counter with both latencies
-        self.output_callback(f'<i>Step {self.step_count} | OmniParser: {latency_omniparser:.2f}s | LLM: {latency_vlm:.2f}s</i>', sender="bot")
+        self.output_callback(f'<i>Step {self.step_count} | OmniParser: {latency_omniparser:.2f}s | LLM: {latency_vlm:.2f}s</i>', )
 
         print(f"{vlm_response}")
         
@@ -226,7 +229,7 @@ class VLMOrchestratedAgent:
             except:
                 print(f"Error parsing: {vlm_response_json}")
                 pass
-        self.output_callback(f'<img src="data:image/png;base64,{img_to_show_base64}">', sender="bot")
+        self.output_callback(f'<img src="data:image/png;base64,{img_to_show_base64}">', )
         
         # Display screen info in a collapsible dropdown
         self.output_callback(
@@ -236,7 +239,6 @@ class VLMOrchestratedAgent:
             f'    <pre>{screen_info}</pre>'
             f'  </div>'
             f'</details>',
-            sender="bot"
         )
         
         vlm_plan_str = ""
@@ -267,6 +269,21 @@ class VLMOrchestratedAgent:
                                             name='computer', type='tool_use')
             response_content.append(sim_content_block)
         response_message = BetaMessage(id=f'toolu_{uuid.uuid4()}', content=response_content, model='', role='assistant', type='message', stop_reason='tool_use', usage=BetaUsage(input_tokens=0, output_tokens=0))
+
+        # save the intermediate step trajectory to the save folder
+        step_trajectory = {
+            "screenshot_path": f"{self.save_folder}/screenshot_{self.step_count}.png",
+            "som_screenshot_path": f"{self.save_folder}/som_screenshot_{self.step_count}.png",
+            "screen_info": screen_info,
+            "latency_omniparser": latency_omniparser,
+            "latency_vlm": latency_vlm,
+            "vlm_response_json": vlm_response_json,
+            'ledger': self.ledger,
+        }
+        with open(f"{self.save_folder}/trajectory.json", "a") as f:
+            f.write(json.dumps(step_trajectory))
+            f.write("\n")
+
         return response_message, vlm_response_json
 
     def _api_response_callback(self, response: APIResponse):
@@ -376,9 +393,8 @@ IMPORTANT NOTES:
         plan = extract_data(vlm_response, "json")
         
         # Create a filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        plan_filename = f"plan_{timestamp}.json"
-        plan_path = self.save_folder / plan_filename
+        plan_filename = f"plan.json"
+        plan_path = os.path.join(self.save_folder, plan_filename)
         
         # Save the plan to a file
         try:

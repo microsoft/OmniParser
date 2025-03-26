@@ -1,4 +1,7 @@
 """
+The app contains:
+- a new UI for the OmniParser AI Agent.
+- 
 python app_new.py --windows_host_url localhost:8006 --omniparser_server_url localhost:8000
 """
 
@@ -28,10 +31,6 @@ import base64
 
 CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
-UPLOAD_FOLDER = Path("./uploads").absolute()
-
-# Create uploads directory if it doesn't exist
-UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 INTRO_TEXT = '''
 <div style="text-align: center; margin-bottom: 10px;">
@@ -46,13 +45,13 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Gradio App")
     parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
     parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
-    parser.add_argument("--upload_folder", type=str, default="./uploads")
+    parser.add_argument("--run_folder", type=str, default="./tmp/outputs")
     return parser.parse_args()
 args = parse_arguments()
 
 # Update upload folder from args if provided
-UPLOAD_FOLDER = Path(args.upload_folder).absolute()
-UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+RUN_FOLDER = Path(os.path.join(args.run_folder, datetime.now().strftime('%Y%m%d_%H%M')))
+RUN_FOLDER.mkdir(parents=True, exist_ok=True)
 
 class Sender(StrEnum):
     USER = "user"
@@ -63,8 +62,8 @@ class Sender(StrEnum):
 def load_existing_files():
     """Load all existing files from the uploads folder"""
     files = []
-    if UPLOAD_FOLDER.exists():
-        for file_path in UPLOAD_FOLDER.iterdir():
+    if RUN_FOLDER.exists():
+        for file_path in RUN_FOLDER.iterdir():
             if file_path.is_file():
                 files.append(str(file_path))
     return files
@@ -277,7 +276,7 @@ def process_input(user_input, state):
         only_n_most_recent_images=state["only_n_most_recent_images"],
         max_tokens=16384,
         omniparser_url=args.omniparser_server_url,
-        save_folder=str(UPLOAD_FOLDER)
+        save_folder=str(RUN_FOLDER)
     ):  
         if loop_msg is None or state.get("stop"):
             # Detect and add new files to the state
@@ -434,7 +433,7 @@ def handle_file_upload(files, state):
     for file in files:
         # Get the file name and create a path in the upload directory
         file_name = Path(file.name).name
-        file_path = UPLOAD_FOLDER / file_name
+        file_path = RUN_FOLDER / file_name
         
         # Save the file
         shutil.copy(file.name, file_path)
@@ -471,9 +470,9 @@ def toggle_view(view_mode, file_path=None, state=None):
 def detect_new_files(state):
     """Detect new files in the uploads folder and add them to the state"""
     new_files_count = 0
-    if UPLOAD_FOLDER.exists():
+    if RUN_FOLDER.exists():
         current_files = set(state['uploaded_files'])
-        for file_path in UPLOAD_FOLDER.iterdir():
+        for file_path in RUN_FOLDER.iterdir():
             if file_path.is_file():
                 file_path_str = str(file_path)
                 if file_path_str not in current_files:
