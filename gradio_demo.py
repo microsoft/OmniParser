@@ -8,7 +8,7 @@ import io
 
 
 import base64, os
-from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+from omniparser.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 import torch
 from PIL import Image
 

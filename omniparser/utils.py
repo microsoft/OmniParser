@@ -41,7 +41,7 @@ import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
-from util.box_annotator import BoxAnnotator 
+from omniparser.box_annotator import BoxAnnotator 
 
 
 def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
