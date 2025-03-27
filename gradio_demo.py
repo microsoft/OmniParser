@@ -8,7 +8,7 @@ import io
 
 
 import base64, os
-from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
+from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img, detect_device
 import torch
 from PIL import Image
 
@@ -27,7 +27,7 @@ MARKDOWN = """
 OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
 """
 
-DEVICE = torch.device('cuda')
+DEVICE = torch.device(detect_device())
 
 # @spaces.GPU
 # @torch.inference_mode()
