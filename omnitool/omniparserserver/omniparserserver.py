@@ -11,7 +11,7 @@ import argparse
 import uvicorn
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(root_dir)
-from util.omniparser import Omniparser
+from omniparser.omniparser import Omniparser
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Omniparser API')
