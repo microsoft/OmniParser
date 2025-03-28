@@ -33,12 +33,22 @@ conda activate omni
 pip install -r requirements.txt
 ```
 
-Ensure you have the V2 weights downloaded in weights folder (ensure caption weights folder is called icon_caption_florence). If not download them with:
-```
+Ensure you have the V2 weights downloaded in the `weights` folder (ensure the caption weights folder is called `icon_caption_florence`).  
+
+#### **Option 1: Install via Bash (Linux/macOS)**
+```sh
    # download the model checkpoints to local directory OmniParser/weights/
    for f in icon_detect/{train_args.yaml,model.pt,model.yaml} icon_caption/{config.json,generation_config.json,model.safetensors}; do huggingface-cli download microsoft/OmniParser-v2.0 "$f" --local-dir weights; done
    mv weights/icon_caption weights/icon_caption_florence
 ```
+
+#### **Option 2: Install via Python (Windows, macOS, Linux)**
+If you're on Windows or prefer a cross-platform method, use the provided Python script:
+
+```python
+python weights_install.py
+```
+This method ensures compatibility across all operating systems (Windows, macOS, and Linux) without relying on Bash commands.  
 
 <!-- ## [deprecated]
 Then download the model ckpts files in: https://huggingface.co/microsoft/OmniParser, and put them under weights/, default folder structure is: weights/icon_detect, weights/icon_caption_florence, weights/icon_caption_blip2. 
