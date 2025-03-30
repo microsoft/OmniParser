@@ -77,6 +77,8 @@ class VLMOrchestratedAgent:
     ):
         if model == "omniparser + gpt-4o" or model == "omniparser + gpt-4o-orchestrated":
             self.model = "gpt-4o-2024-11-20"
+        elif model == "omniparser + gpt-4.5-preview" or model == "omniparser + gpt-4.5-preview-orchestrated":
+            self.model = "gpt-4.5-preview"
         elif model == "omniparser + R1" or model == "omniparser + R1-orchestrated":
             self.model = "deepseek-r1-distill-llama-70b"
         elif model == "omniparser + qwen2.5vl" or model == "omniparser + qwen2.5vl-orchestrated":
