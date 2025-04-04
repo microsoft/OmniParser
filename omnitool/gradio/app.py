@@ -190,7 +190,7 @@ def valid_params(user_input, state):
     """Validate all requirements and return a list of error messages."""
     errors = []
     
-    for server_name, url in [('Windows Host', 'localhost:5000'), ('OmniParser Server', args.omniparser_server_url)]:
+    for server_name, url in [('OmniParser Server', args.omniparser_server_url)]:
         try:
             url = f'http://{url}/probe'
             response = requests.get(url, timeout=3)
@@ -343,12 +343,12 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     with gr.Row():
         with gr.Column(scale=2):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
-        with gr.Column(scale=3):
-            iframe = gr.HTML(
-                f'<iframe src="http://{args.windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
-                container=False,
-                elem_classes="no-padding"
-            )
+        # with gr.Column(scale=3):
+        #     iframe = gr.HTML(
+        #         f'<iframe src="http://{args.windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+        #         container=False,
+        #         elem_classes="no-padding"
+        #     )
 
     def update_model(model_selection, state):
         state["model"] = model_selection

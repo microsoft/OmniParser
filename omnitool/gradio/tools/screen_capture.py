@@ -4,6 +4,7 @@ import requests
 from PIL import Image
 from .base import BaseAnthropicTool, ToolError
 from io import BytesIO
+import pyautogui
 
 OUTPUT_DIR = "./tmp/outputs"
 
@@ -14,15 +15,14 @@ def get_screenshot(resize: bool = False, target_width: int = 1920, target_height
     path = output_dir / f"screenshot_{uuid4().hex}.png"
     
     try:
-        response = requests.get('http://localhost:5000/screenshot')
-        if response.status_code != 200:
-            raise ToolError(f"Failed to capture screenshot: HTTP {response.status_code}")
+        screenshot = pyautogui.screenshot()
+        size = pyautogui.size()
+
+        target_width = size.width
+        target_height = size.height
         
-        # (1280, 800)
-        screenshot = Image.open(BytesIO(response.content))
-        
-        if resize and screenshot.size != (target_width, target_height):
-            screenshot = screenshot.resize((target_width, target_height))
+        screenshot = screenshot.resize((target_width, target_height))
+
         screenshot.save(path)
         return screenshot, path
     except Exception as e:

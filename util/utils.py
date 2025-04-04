@@ -43,10 +43,19 @@ import supervision as sv
 import torchvision.transforms as T
 from util.box_annotator import BoxAnnotator 
 
+def detect_device() -> str:
+    if torch.cuda.is_available():
+        print("[+] Using CUDA")
+        return "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        print("[+] Using MPS for Apple Silicon")
+        return "mps"
+    else:
+        return "cpu"
 
 def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
     if not device:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = detect_device()
     if model_name == "blip2":
         from transformers import Blip2Processor, Blip2ForConditionalGeneration
         processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
@@ -107,7 +116,7 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
         start = time.time()
         batch = croped_pil_image[i:i+batch_size]
         t1 = time.time()
-        if model.device.type == 'cuda':
+        if model.device.type == 'cuda' or model.device.type == 'mps':
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt", do_resize=False).to(device=device, dtype=torch.float16)
         else:
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device)

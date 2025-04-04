@@ -2,6 +2,11 @@ import base64
 import time
 from enum import StrEnum
 from typing import Literal, TypedDict
+import threading
+import shlex
+import os
+import subprocess
+import pyautogui
 
 from PIL import Image
 
@@ -11,6 +16,8 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from .screen_capture import get_screenshot
 import requests
 import re
+
+computer_control_lock = threading.Lock()
 
 OUTPUT_DIR = "./tmp/outputs"
 
@@ -236,18 +243,12 @@ class ComputerTool(BaseAnthropicTool):
 
         try:
             print(f"sending to vm: {command_list}")
-            response = requests.post(
-                f"http://localhost:5000/execute", 
-                headers={'Content-Type': 'application/json'},
-                json={"command": command_list},
-                timeout=90
-            )
+            response = self.execute(command_list)
             time.sleep(0.7) # avoid async error as actions take time to complete
             print(f"action executed")
-            if response.status_code != 200:
-                raise ToolError(f"Failed to execute command. Status code: {response.status_code}")
+
             if parse:
-                output = response.json()['output'].strip()
+                output = response['output'].strip()
                 match = re.search(r'Point\(x=(\d+),\s*y=(\d+)\)', output)
                 if not match:
                     raise ToolError(f"Could not parse coordinates from output: {output}")
@@ -255,6 +256,31 @@ class ComputerTool(BaseAnthropicTool):
                 return x, y
         except requests.exceptions.RequestException as e:
             raise ToolError(f"An error occurred while trying to execute the command: {str(e)}")
+        
+    def execute(self, command, shell=False):
+        with computer_control_lock:
+            if isinstance(command, str) and not shell:
+                command = shlex.split(command)
+
+            # Expand user directory
+            for i, arg in enumerate(command):
+                if arg.startswith("~/"):
+                    command[i] = os.path.expanduser(arg)
+
+            # Execute the command without any safety checks.
+            try:
+                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, text=True, timeout=120)
+                return {
+                    'status': 'success',
+                    'output': result.stdout,
+                    'error': result.stderr,
+                    'returncode': result.returncode
+                }
+            except Exception as e:
+                return {
+                    'status': 'error',
+                    'message': str(e)
+                }
 
     async def screenshot(self):
         if not hasattr(self, 'target_dimension'):
@@ -310,16 +336,9 @@ class ComputerTool(BaseAnthropicTool):
     def get_screen_size(self):
         """Return width and height of the screen"""
         try:
-            response = requests.post(
-                f"http://localhost:5000/execute",
-                headers={'Content-Type': 'application/json'},
-                json={"command": ["python", "-c", "import pyautogui; print(pyautogui.size())"]},
-                timeout=90
-            )
-            if response.status_code != 200:
-                raise ToolError(f"Failed to get screen size. Status code: {response.status_code}")
+            response = self.execute(["python", "-c", "import pyautogui; print(pyautogui.size())"])
             
-            output = response.json()['output'].strip()
+            output = response['output'].strip()
             match = re.search(r'Size\(width=(\d+),\s*height=(\d+)\)', output)
             if not match:
                 raise ToolError(f"Could not parse screen size from output: {output}")

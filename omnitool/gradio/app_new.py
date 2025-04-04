@@ -223,7 +223,7 @@ def valid_params(user_input, state):
     """Validate all requirements and return a list of error messages."""
     errors = []
     
-    for server_name, url in [('Windows Host', 'localhost:5000'), ('OmniParser Server', args.omniparser_server_url)]:
+    for server_name, url in [('OmniParser Server', args.omniparser_server_url)]:
         try:
             url = f'http://{url}/probe'
             response = requests.get(url, timeout=3)
