@@ -30,3 +30,5 @@ screeninfo
 uiautomation
 dashscope
 groq
+google-genai
+tiktoken

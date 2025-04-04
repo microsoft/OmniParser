@@ -39,7 +39,7 @@ class APIProvider(StrEnum):
     VERTEX = "vertex"
 
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-* You are utilizing a Windows system with internet access.
+* You are utilizing a {platform.system()} system with internet access.
 * The current date is {datetime.today().strftime('%A, %B %d, %Y')}.
 </SYSTEM_CAPABILITY>
 """
