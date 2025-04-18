@@ -41,6 +41,7 @@ PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
 
 def sampling_loop_sync(
     *,
+    args,
     model: str,
     provider: APIProvider | None,
     messages: list[BetaMessageParam],
@@ -50,17 +51,17 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    omniparser_url: str,
     save_folder: str = "./uploads"
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser_client = OmniParserClient(url=f"http://{omniparser_url}/parse/")
+    omniparser_client = OmniParserClient(host_device=args.host_device, url=f"http://{args.omniparser_server_url}/parse/")
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(
+            args=args,
             model=model, 
             provider=provider,
             api_key=api_key, 
@@ -92,6 +93,7 @@ def sampling_loop_sync(
     else:
         raise ValueError(f"Model {model} not supported")
     executor = AnthropicExecutor(
+        args=args,
         output_callback=output_callback,
         tool_output_callback=tool_output_callback,
     )

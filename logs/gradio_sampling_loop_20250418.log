@@ -1,2 +1,0 @@
-2025-04-18 19:52:05 - sampling_loop - INFO - [+] Initializing sampling loop with model: omniparser + gemini-2.5-flash-preview-04-17
-2025-04-18 19:52:05 - sampling_loop - ERROR - [-] Failed to initialize OmniParser client: name 'OmniParserClient' is not defined

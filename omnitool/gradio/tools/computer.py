@@ -6,7 +6,6 @@ import threading
 import shlex
 import os
 import subprocess
-import pyautogui
 
 from PIL import Image
 
@@ -95,8 +94,10 @@ class ComputerTool(BaseAnthropicTool):
     def to_params(self) -> BetaToolComputerUse20241022Param:
         return {"name": self.name, "type": self.api_type, **self.options}
 
-    def __init__(self, is_scaling: bool = False):
+    def __init__(self, args, is_scaling: bool = False):
         super().__init__()
+
+        self.args = args
 
         # Get screen width and height using Windows command
         self.display_num = None
@@ -148,11 +149,11 @@ class ComputerTool(BaseAnthropicTool):
             print(f"mouse move to {x}, {y}")
             
             if action == "mouse_move":
-                self.send_to_vm(f"pyautogui.moveTo({x}, {y})")
+                self.send_to_host_device(f"pyautogui.moveTo({x}, {y})")
                 return ToolResult(output=f"Moved mouse to ({x}, {y})")
             elif action == "left_click_drag":
-                current_x, current_y = self.send_to_vm("pyautogui.position()")
-                self.send_to_vm(f"pyautogui.dragTo({x}, {y}, duration=0.5)")
+                current_x, current_y = self.send_to_host_device("pyautogui.position()")
+                self.send_to_host_device(f"pyautogui.dragTo({x}, {y}, duration=0.5)")
                 return ToolResult(output=f"Dragged mouse from ({current_x}, {current_y}) to ({x}, {y})")
 
         if action in ("key", "type"):
@@ -169,18 +170,18 @@ class ComputerTool(BaseAnthropicTool):
                 for key in keys:
                     key = self.key_conversion.get(key.strip(), key.strip())
                     key = key.lower()
-                    self.send_to_vm(f"pyautogui.keyDown('{key}')")  # Press down each key
+                    self.send_to_host_device(f"pyautogui.keyDown('{key}')")  # Press down each key
                 for key in reversed(keys):
                     key = self.key_conversion.get(key.strip(), key.strip())
                     key = key.lower()
-                    self.send_to_vm(f"pyautogui.keyUp('{key}')")    # Release each key in reverse order
+                    self.send_to_host_device(f"pyautogui.keyUp('{key}')")    # Release each key in reverse order
                 return ToolResult(output=f"Pressed keys: {text}")
             
             elif action == "type":
                 # default click before type TODO: check if this is needed
-                self.send_to_vm("pyautogui.click()")
-                self.send_to_vm(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
-                self.send_to_vm("pyautogui.press('enter')")
+                self.send_to_host_device("pyautogui.click()")
+                self.send_to_host_device(f"pyautogui.typewrite('{text}', interval={TYPING_DELAY_MS / 1000})")
+                self.send_to_host_device("pyautogui.press('enter')")
                 screenshot_base64 = (await self.screenshot()).base64_image
                 return ToolResult(output=text, base64_image=screenshot_base64)
 
@@ -201,28 +202,28 @@ class ComputerTool(BaseAnthropicTool):
             if action == "screenshot":
                 return await self.screenshot()
             elif action == "cursor_position":
-                x, y = self.send_to_vm("pyautogui.position()")
+                x, y = self.send_to_host_device("pyautogui.position()")
                 x, y = self.scale_coordinates(ScalingSource.COMPUTER, x, y)
                 return ToolResult(output=f"X={x},Y={y}")
             else:
                 if action == "left_click":
-                    self.send_to_vm("pyautogui.click()")
+                    self.send_to_host_device("pyautogui.click()")
                 elif action == "right_click":
-                    self.send_to_vm("pyautogui.rightClick()")
+                    self.send_to_host_device("pyautogui.rightClick()")
                 elif action == "middle_click":
-                    self.send_to_vm("pyautogui.middleClick()")
+                    self.send_to_host_device("pyautogui.middleClick()")
                 elif action == "double_click":
-                    self.send_to_vm("pyautogui.doubleClick()")
+                    self.send_to_host_device("pyautogui.doubleClick()")
                 elif action == "left_press":
-                    self.send_to_vm("pyautogui.mouseDown()")
+                    self.send_to_host_device("pyautogui.mouseDown()")
                     time.sleep(1)
-                    self.send_to_vm("pyautogui.mouseUp()")
+                    self.send_to_host_device("pyautogui.mouseUp()")
                 return ToolResult(output=f"Performed {action}")
         if action in ("scroll_up", "scroll_down"):
             if action == "scroll_up":
-                self.send_to_vm("pyautogui.scroll(100)")
+                self.send_to_host_device("pyautogui.scroll(100)")
             elif action == "scroll_down":
-                self.send_to_vm("pyautogui.scroll(-100)")
+                self.send_to_host_device("pyautogui.scroll(-100)")
             return ToolResult(output=f"Performed {action}")
         if action == "hover":
             return ToolResult(output=f"Performed {action}")
@@ -231,7 +232,7 @@ class ComputerTool(BaseAnthropicTool):
             return ToolResult(output=f"Performed {action}")
         raise ToolError(f"Invalid action: {action}")
 
-    def send_to_vm(self, action: str):
+    def send_to_host_device(self, action: str):
         """
         Executes a python command on the server. Only return tuple of x,y when action is "pyautogui.position()"
         """
@@ -243,7 +244,17 @@ class ComputerTool(BaseAnthropicTool):
 
         try:
             print(f"sending to vm: {command_list}")
-            response = self.execute(command_list)
+
+            if self.args.host_device == "omnibox_windows":
+                response = requests.post(
+                    f"http://localhost:5000/execute", 
+                    headers={'Content-Type': 'application/json'},
+                    json={"command": command_list},
+                    timeout=90
+                )
+            elif self.args.host_device == "local":
+                response = self.execute(command_list)
+
             time.sleep(0.7) # avoid async error as actions take time to complete
             print(f"action executed")
 
@@ -287,7 +298,7 @@ class ComputerTool(BaseAnthropicTool):
             screenshot = self.padding_image(screenshot)
             self.target_dimension = MAX_SCALING_TARGETS["WXGA"]
         width, height = self.target_dimension["width"], self.target_dimension["height"]
-        screenshot, path = get_screenshot(resize=True, target_width=width, target_height=height)
+        screenshot, path = get_screenshot(host_device=self.args.host_device, resize=True, target_width=width, target_height=height)
         time.sleep(0.7) # avoid async error as actions take time to complete
         return ToolResult(base64_image=base64.b64encode(path.read_bytes()).decode())
 

@@ -47,6 +47,7 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 class AnthropicActor:
     def __init__(
         self, 
+        args,
         model: str, 
         provider: APIProvider,
         api_key: str,
@@ -62,7 +63,7 @@ class AnthropicActor:
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
         
-        self.tool_collection = ToolCollection(ComputerTool())
+        self.tool_collection = ToolCollection(ComputerTool(args=args))
 
         self.system = SYSTEM_PROMPT
         
