@@ -16,7 +16,7 @@ class Action(BaseModel):
 
 def run_gemini_interleaved(messages: list, system: str, model_name: str, api_key: str, max_tokens: int, temperature=0):    
     """
-    Run a chat completion through Gemini's API, ignoring any images in the messages.
+    Run a chat completion through Google Gemini's API
     """
     api_key = api_key or os.environ.get("GEMINI_API_KEY")
     if not api_key:
