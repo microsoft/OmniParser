@@ -1,0 +1,21 @@
+2025-04-18 19:00:23 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:00:23 - ocr_utils - INFO - Initializing EasyOCR reader
+2025-04-18 19:00:27 - ocr_utils - INFO - EasyOCR found 36 text elements
+2025-04-18 19:00:43 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:00:45 - ocr_utils - INFO - EasyOCR found 35 text elements
+2025-04-18 19:01:06 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:01:08 - ocr_utils - INFO - EasyOCR found 101 text elements
+2025-04-18 19:01:31 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:01:32 - ocr_utils - INFO - EasyOCR found 86 text elements
+2025-04-18 19:01:52 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:01:54 - ocr_utils - INFO - EasyOCR found 110 text elements
+2025-04-18 19:02:12 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:02:14 - ocr_utils - INFO - EasyOCR found 86 text elements
+2025-04-18 19:02:55 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:02:57 - ocr_utils - INFO - EasyOCR found 99 text elements
+2025-04-18 19:03:11 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:03:14 - ocr_utils - INFO - EasyOCR found 84 text elements
+2025-04-18 19:03:24 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:03:27 - ocr_utils - INFO - EasyOCR found 21 text elements
+2025-04-18 19:03:41 - ocr_utils - INFO - Running OCR on image of size 1470x956
+2025-04-18 19:03:44 - ocr_utils - INFO - EasyOCR found 125 text elements

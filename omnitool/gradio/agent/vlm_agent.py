@@ -53,6 +53,8 @@ class VLMAgent:
             self.model = "o3-mini"
         elif model == "omniparser + gemini-2.0-flash":
             self.model = "gemini-2.0-flash"
+        elif model == "omniparser + gemini-2.5-flash-preview-04-17": 
+            self.model = "gemini-2.5-flash-preview-04-17"
         else:
             raise ValueError(f"Model {model} not supported")
         
@@ -137,17 +139,18 @@ class VLMAgent:
             print(f"qwen token usage: {token_usage}")
             self.total_token_usage += token_usage
             self.total_cost += (token_usage * 2.2 / 1000000)  # https://help.aliyun.com/zh/model-studio/getting-started/models?spm=a2c4g.11186623.0.0.74b04823CGnPv7#fe96cfb1a422a
-        elif "gemini-2.0-flash" in self.model:
+        elif "gemini" in self.model:
             vlm_response, token_usage = run_gemini_interleaved(
                 messages=planner_messages,
                 system=system,
                 model_name=self.model,
                 api_key=self.api_key,
+                max_tokens=self.max_tokens,
                 temperature=0,
             )
             print(f"gemini token usage: {token_usage}")
             self.total_token_usage += token_usage
-            self.total_cost += (token_usage * 0.99 / 1000000)
+            self.total_cost += 0 # assume using free tier
         else:
             raise ValueError(f"Model {self.model} not supported")
         latency_vlm = time.time() - start
@@ -226,7 +229,9 @@ class VLMAgent:
         main_section = f"""
 You are using a {platform.system()} device.
 You are able to use a mouse and keyboard to interact with the computer based on the given task and screenshot.
-You can only interact with the desktop GUI (no terminal or application menu access) and ignore the gradio interface (which opened in localhost:7888) including the orange send button there.
+You can only interact with the desktop GUI (no terminal or application menu access)
+
+!!!DO NOT interact with the chatbot webpage interface that opens in 0.0.0.0:7888. You don't need to click the orange send button because the user already clicked it!!!
 
 You may be given some history plan and actions, this is the response from the previous loop.
 You should carefully consider your plan base on the task, screenshot, and history actions.
@@ -244,6 +249,15 @@ Your available "Next Action" only include:
 - wait: waits for 1 second for the device to load or respond.
 
 Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on (if action is one of 'type', 'hover', 'scroll_up', 'scroll_down', 'wait', there should be no Box ID field), and the value (if the action is 'type') in order to complete the task.
+
+Use this JSON schema:
+
+Action = {{
+    "Reasoning": str,
+    "Next Action": str,
+    "Box ID": str | None,
+    "value": str | None
+}}
 
 Output format:
 ```json

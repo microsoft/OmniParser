@@ -1,0 +1,7 @@
+2025-04-18 19:49:59 - gradio_app - INFO - [+] Starting OmniTool Gradio server on port 7888
+2025-04-18 19:50:20 - gradio_app - INFO - [+] Model updated to: omniparser + gemini-2.0-flash
+2025-04-18 19:51:16 - gradio_app - INFO - [+] Starting OmniTool Gradio server on port 7888
+2025-04-18 19:51:22 - gradio_app - INFO - [+] Model updated to: omniparser + gemini-2.5-flash-preview-04-17
+2025-04-18 19:52:05 - gradio_app - INFO - [+] Processing user input: 'on my spotify play "garam dan madu"...' (truncated)
+2025-04-18 19:52:05 - gradio_app - ERROR - [-] Error in sampling loop: name 'OmniParserClient' is not defined
+2025-04-18 19:52:05 - gradio_app - INFO - [+] Input processing completed in 0.14s

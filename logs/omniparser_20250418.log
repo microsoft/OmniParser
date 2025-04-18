@@ -1,0 +1,62 @@
+2025-04-18 18:58:51 - omniparser - INFO - Initializing OmniParser
+2025-04-18 18:58:52 - omniparser - INFO - SOM model loaded from ../../weights/icon_detect/model.pt
+2025-04-18 18:59:03 - omniparser - INFO - Caption model loaded: florence2
+2025-04-18 18:59:03 - omniparser - INFO - OmniParser initialization complete!
+2025-04-18 18:59:07 - omniparser - INFO - Initializing OmniParser
+2025-04-18 18:59:07 - omniparser - INFO - SOM model loaded from ../../weights/icon_detect/model.pt
+2025-04-18 18:59:20 - omniparser - INFO - Caption model loaded: florence2
+2025-04-18 18:59:20 - omniparser - INFO - OmniParser initialization complete!
+2025-04-18 18:59:20 - omniparser - INFO - Initializing OmniParser
+2025-04-18 18:59:20 - omniparser - INFO - SOM model loaded from ../../weights/icon_detect/model.pt
+2025-04-18 18:59:29 - omniparser - INFO - Caption model loaded: florence2
+2025-04-18 18:59:29 - omniparser - INFO - OmniParser initialization complete!
+2025-04-18 19:00:23 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:00:23 - omniparser - INFO - Running OCR on image
+2025-04-18 19:00:27 - omniparser - INFO - OCR found 36 text elements
+2025-04-18 19:00:27 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:00:29 - omniparser - INFO - Parsing complete. Found 62 UI elements
+2025-04-18 19:00:43 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:00:43 - omniparser - INFO - Running OCR on image
+2025-04-18 19:00:45 - omniparser - INFO - OCR found 35 text elements
+2025-04-18 19:00:45 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:00:47 - omniparser - INFO - Parsing complete. Found 58 UI elements
+2025-04-18 19:01:06 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:01:06 - omniparser - INFO - Running OCR on image
+2025-04-18 19:01:08 - omniparser - INFO - OCR found 101 text elements
+2025-04-18 19:01:08 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:01:10 - omniparser - INFO - Parsing complete. Found 130 UI elements
+2025-04-18 19:01:31 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:01:31 - omniparser - INFO - Running OCR on image
+2025-04-18 19:01:32 - omniparser - INFO - OCR found 86 text elements
+2025-04-18 19:01:32 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:01:34 - omniparser - INFO - Parsing complete. Found 127 UI elements
+2025-04-18 19:01:52 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:01:52 - omniparser - INFO - Running OCR on image
+2025-04-18 19:01:54 - omniparser - INFO - OCR found 110 text elements
+2025-04-18 19:01:54 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:01:56 - omniparser - INFO - Parsing complete. Found 141 UI elements
+2025-04-18 19:02:12 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:02:12 - omniparser - INFO - Running OCR on image
+2025-04-18 19:02:14 - omniparser - INFO - OCR found 86 text elements
+2025-04-18 19:02:14 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:02:15 - omniparser - INFO - Parsing complete. Found 127 UI elements
+2025-04-18 19:02:55 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:02:55 - omniparser - INFO - Running OCR on image
+2025-04-18 19:02:57 - omniparser - INFO - OCR found 99 text elements
+2025-04-18 19:02:57 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:03:00 - omniparser - INFO - Parsing complete. Found 126 UI elements
+2025-04-18 19:03:11 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:03:11 - omniparser - INFO - Running OCR on image
+2025-04-18 19:03:14 - omniparser - INFO - OCR found 84 text elements
+2025-04-18 19:03:14 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:03:16 - omniparser - INFO - Parsing complete. Found 115 UI elements
+2025-04-18 19:03:24 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:03:24 - omniparser - INFO - Running OCR on image
+2025-04-18 19:03:27 - omniparser - INFO - OCR found 21 text elements
+2025-04-18 19:03:27 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:03:30 - omniparser - INFO - Parsing complete. Found 73 UI elements
+2025-04-18 19:03:41 - omniparser - INFO - Processing image of size 1470x956
+2025-04-18 19:03:41 - omniparser - INFO - Running OCR on image
+2025-04-18 19:03:44 - omniparser - INFO - OCR found 125 text elements
+2025-04-18 19:03:44 - omniparser - INFO - Processing image with SOM labeling
+2025-04-18 19:03:47 - omniparser - INFO - Parsing complete. Found 151 UI elements
