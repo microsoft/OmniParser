@@ -53,7 +53,7 @@ download 'model_v1_5.pt' from https://huggingface.co/microsoft/OmniParser/tree/m
 ``` -->
 
 ## Examples:
-We put together a few simple examples in the demo.ipynb. 
+We put together a few simple examples in the demo.ipynb
 
 ## Gradio Demo
 To run gradio demo, simply run:
