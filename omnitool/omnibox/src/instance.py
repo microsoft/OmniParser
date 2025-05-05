@@ -26,7 +26,7 @@ class IInstance:
         raise NotImplementedError("Subclasses should implement this!")
 
 
-def DummyInstance(IInstance):
+def MockInstance(IInstance):
     def __init__(self, root_path = None, instance_num = 0):
         self.root_path = root_path
         self.instance_num = instance_num
