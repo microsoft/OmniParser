@@ -104,8 +104,8 @@ class Client:
 
         waitTime = ipywidgets.FloatLogSlider(base=2, value = 1, min = -3, max = 5, step = 1, description = 'wait (s)')
 
-        x = ipywidgets.IntSlider(min = 0, max = screensize['width'], value = position['x'], description = 'X')
-        y = ipywidgets.IntSlider(min = 0, max = screensize['height'], value = position['y'], description = 'Y')
+        x = ipywidgets.IntSlider(min = 0, max = screensize.get('width', 1), value = position.get('x', 0), description = 'X')
+        y = ipywidgets.IntSlider(min = 0, max = screensize.get('height', 1), value = position.get('y', 0), description = 'Y')
 
         click = ipywidgets.Button(description = 'Click')
         rightClick = ipywidgets.Button(description = 'Right Click')
