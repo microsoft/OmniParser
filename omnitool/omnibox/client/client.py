@@ -189,7 +189,7 @@ class HostClient:
         get_button = ipywidgets.Button(description = 'Get Instance')
         release_button = ipywidgets.Button(description = 'Release Instance')
         instances = ipywidgets.RadioButtons(description = 'Instances', options = self.get_instances_info()['in_use'], layout=ipywidgets.Layout(width='50%'))
-        
+        self.instance_id = instances.value
         def on_add_click(b):
             self.get_instance()
             info = self.get_instances_info()
@@ -210,6 +210,7 @@ class HostClient:
         if self.instance_id:
             screensize = self.screensize(self.instance_id)
             position = self.position(self.instance_id)
+            self._display(self.instance_id)
 
         x = ipywidgets.IntSlider(min = 0, max = screensize.get('width', 1), value = position.get('x', 0), description = 'X')
         y = ipywidgets.IntSlider(min = 0, max = screensize.get('height', 1), value = position.get('y', 0), description = 'Y')
