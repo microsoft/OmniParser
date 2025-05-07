@@ -1,9 +1,9 @@
 import os
 import subprocess
-import tempfile
 import time
 import requests
 from pathlib import Path
+from typing import Dict, Any
 
 
 class IInstance:
@@ -29,10 +29,7 @@ class IInstance:
         raise NotImplementedError("Subclasses should implement this!")
 
     def reset_soft(self):
-        self.stop()
-        if os.path.exists(f"omnibox-{self.instance_num}"):
-            subprocess.run(["sudo", "rm", "-rf", f"{self.root_path}/omnibox-{self.instance_num}"], check=True)
-        self.start()
+        raise NotImplementedError("Subclasses should implement this!")
 
 
 _compose_template = """
@@ -69,7 +66,7 @@ services:
 
 class Instance(IInstance):
     def __init__(self, root_path = None, instance_num = 0):
-        self.root_path = Path(root_path or os.path.dirname(__file__))
+        self.root_path = Path(root_path or os.path.dirname(__file__)).resolve()
         self.instance_num = instance_num
         self.config_path = self.root_path / f'{instance_num}.yml'
         with open(self.config_path, mode='w') as temp_file:
