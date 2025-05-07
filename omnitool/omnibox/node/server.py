@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.post("/instances/get")
+@app.post("/get")
 def get_instance():
     """Get an available instance from the pool"""
     instance_uuid = instance_manager.start()
@@ -33,47 +33,47 @@ def get_instance():
         raise HTTPException(status_code=503, detail="No instances available")
     return {"instance_uuid": instance_uuid}
 
-@app.post("/instances/{instance_uuid}/reset")
-def reset_instance(instance_uuid: str):
+@app.post("/reset")
+def reset_instance(instance_id: str):
     """Reset an instance to its initial state and make it available again"""
-    if instance_manager.reset(instance_uuid):
-        return {"status": "success", "message": f"UUID {instance_uuid} for instance has been queued for reset"}
-    raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_uuid}")
+    if instance_manager.reset(instance_id):
+        return {"status": "success", "message": f"UUID {instance_id} for instance has been queued for reset"}
+    raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
 
-@app.post("/instances/{instance_uuid}/execute")
-async def execute_instance_command(instance_uuid: str, command_data: Dict[str, Any]):
+@app.post("/execute")
+async def execute_instance_command(instance_id: str, command_data: Dict[str, Any]):
     """Forward execute command to the Flask server in the specified instance"""
-    instance= instance_manager.get(instance_uuid)
+    instance= instance_manager.get(instance_id)
     if not instance:
-        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_uuid}")
+        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
     try:
         return InstanceClient(instance.flask_url()).execute(command_data)
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error communicating with instance {instance.instance_num}: {str(e)}")
 
-@app.get("/instances/{instance_uuid}/screenshot")
-async def get_instance_screenshot(instance_uuid: str):
+@app.get("/screenshot")
+async def get_instance_screenshot(instance_id: str):
     """Forward screenshot request to the Flask server in the specified instance"""
-    instance = instance_manager.get(instance_uuid)
+    instance = instance_manager.get(instance_id)
     if not instance:
-        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_uuid}")
+        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
     try:
         return InstanceClient(instance.flask_url()).screenshot()
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_uuid} for instance {instance.instance_num}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_id} for instance {instance.instance_num}: {str(e)}")
 
-@app.get("/instances/{instance_uuid}/probe")
-async def probe_instance(instance_uuid: str):
+@app.get("/probe")
+async def probe_instance(instance_id: str):
     """Forward probe request to the Flask server in the specified instance"""
-    instance= instance_manager.get(instance_uuid)
+    instance= instance_manager.get(instance_id)
     if not instance:
-        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_uuid}")
+        raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
     try:
         return InstanceClient(instance.flask_url()).probe()
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_uuid} for instance {instance.instance_num}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_id} for instance {instance.instance_num}: {str(e)}")
 
-@app.get("/instances/info")
+@app.get("/info")
 def get_available_instances():
     """Get an available instance from the pool"""
     return {

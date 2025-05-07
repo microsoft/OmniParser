@@ -142,27 +142,30 @@ class NodeClient:
         self.instance_id = None
 
     def get_instance(self):
-        data = requests.post(f'http://{self.host}:{self.port}/instances/get')
+        data = requests.post(f'http://{self.host}:{self.port}/get')
         instance_id = data.json()['instance_uuid']
         return instance_id
     
     def get_instances_info(self):
-        data = requests.get(f'http://{self.host}:{self.port}/instances/info')
+        data = requests.get(f'http://{self.host}:{self.port}/info')
         return data.json()    
     
     def reset_instance(self, instance_id):
-        data = requests.post(f'http://{self.host}:{self.port}/instances/{instance_id}/reset')
+        data = requests.post(f'http://{self.host}:{self.port}/reset', params = {'instance_id': instance_id})
         if data.status_code != 200:
             raise Exception(f"Error: {data.status_code} - {data.text}")
         return data.json()
 
     def screenshot(self, instance_id):
-        data = requests.get(f'http://{self.host}:{self.port}/instances/{instance_id}/screenshot')
+        data = requests.get(f'http://{self.host}:{self.port}/screenshot', params = {'instance_id': instance_id})
         image_data = io.BytesIO(data.content)
         return Image.open(image_data)
 
     def execute(self, instance_id, command):
-        return requests.post(f'http://{self.host}:{self.port}/instances/{instance_id}/execute', json = command)
+        return requests.post(
+            f'http://{self.host}:{self.port}/execute',
+            params={'instance_id': instance_id},
+            json = command)
     
     def do_and_show(self, instance_id, command, waitTime):
         response = self.execute(instance_id, command)
