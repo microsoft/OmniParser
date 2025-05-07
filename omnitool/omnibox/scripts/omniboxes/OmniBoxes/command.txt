@@ -1,1 +1,0 @@
-az storage blob upload-batch --account-name goldenimage --sas-token "sp=racw&st=2025-04-02T23:09:18Z&se=2025-04-03T07:09:18Z&spr=https&sv=2024-11-04&sr=c&sig=kCahg2xb32DgJjOGYiDAcX716m6df5AZBD2KV5sPeVs%3D" --destination goldenimages --source /home/thomasdh/OmniBoxes/common
