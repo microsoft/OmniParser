@@ -134,7 +134,7 @@ class InstanceClient:
             self.output]))
         
 
-class HostClient:
+class NodeClient:
     def __init__(self, host = 'localhost', port = 8000):
         self.host = host
         self.port = port
