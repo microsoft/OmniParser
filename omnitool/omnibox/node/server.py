@@ -28,10 +28,10 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/get")
 def get_instance():
     """Get an available instance from the pool"""
-    instance_uuid = instance_manager.start()
-    if not instance_uuid:
+    instance_id = instance_manager.start()
+    if not instance_id:
         raise HTTPException(status_code=503, detail="No instances available")
-    return {"instance_uuid": instance_uuid}
+    return {"instance_id": instance_id}
 
 @app.post("/reset")
 def reset_instance(instance_id: str):
@@ -40,16 +40,16 @@ def reset_instance(instance_id: str):
         return {"status": "success", "message": f"UUID {instance_id} for instance has been queued for reset"}
     raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
 
-@app.post("/execute")
-async def execute_instance_command(instance_id: str, command_data: Dict[str, Any]):
-    """Forward execute command to the Flask server in the specified instance"""
+@app.get("/probe")
+async def probe_instance(instance_id: str):
+    """Forward probe request to the Flask server in the specified instance"""
     instance= instance_manager.get(instance_id)
     if not instance:
         raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
     try:
-        return InstanceClient(instance.flask_url()).execute(command_data)
+        return InstanceClient(instance.flask_url()).probe()
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error communicating with instance {instance.instance_num}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_id} for instance {instance.instance_num}: {str(e)}")
 
 @app.get("/screenshot")
 async def get_instance_screenshot(instance_id: str):
@@ -62,16 +62,16 @@ async def get_instance_screenshot(instance_id: str):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_id} for instance {instance.instance_num}: {str(e)}")
 
-@app.get("/probe")
-async def probe_instance(instance_id: str):
-    """Forward probe request to the Flask server in the specified instance"""
+@app.post("/execute")
+async def execute_instance_command(instance_id: str, command_data: Dict[str, Any]):
+    """Forward execute command to the Flask server in the specified instance"""
     instance= instance_manager.get(instance_id)
     if not instance:
         raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_id}")
     try:
-        return InstanceClient(instance.flask_url()).probe()
+        return InstanceClient(instance.flask_url()).execute(command_data)
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_id} for instance {instance.instance_num}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error communicating with instance {instance.instance_num}: {str(e)}")
 
 @app.get("/info")
 def get_available_instances():

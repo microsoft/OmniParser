@@ -143,7 +143,7 @@ class NodeClient:
 
     def get_instance(self):
         data = requests.post(f'http://{self.host}:{self.port}/get')
-        instance_id = data.json()['instance_uuid']
+        instance_id = data.json()['instance_id']
         return instance_id
     
     def get_instances_info(self):

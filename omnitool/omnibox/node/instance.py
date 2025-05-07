@@ -4,6 +4,7 @@ import time
 import requests
 from pathlib import Path
 from typing import Dict, Any
+from logging_utils import default_logger
 
 
 class IInstance:
@@ -65,10 +66,11 @@ services:
 
 
 class Instance(IInstance):
-    def __init__(self, root_path = None, instance_num = 0):
+    def __init__(self, root_path = None, instance_num = 0, logger = None):
         self.root_path = Path(root_path or os.path.dirname(__file__)).resolve()
         self.instance_num = instance_num
         self.config_path = self.root_path / f'{instance_num}.yml'
+        self.logger = logger or default_logger()
         with open(self.config_path, mode='w') as temp_file:
             compose_content = _compose_template.format(
                 instance = self.instance_num,
@@ -90,9 +92,9 @@ class Instance(IInstance):
                 stdout=subprocess.DEVNULL,  # Suppress standard output
                 stderr=subprocess.DEVNULL   # Suppress error output
             )
-            print(f"Instance {self.instance_num} launched successfully!")
+            self.logger.info(f"Instance {self.instance_num} launched successfully!")
         except subprocess.CalledProcessError as e:
-            print(f"Error launching instance {self.instance_num}: {e}")
+            self.logger.error(f"Error launching instance {self.instance_num}: {e}")
 
     def start(self):
         try:
@@ -102,9 +104,9 @@ class Instance(IInstance):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            print(f"Instance {self.instance_num} started successfully!")
+            self.logger.info(f"Instance {self.instance_num} started successfully!")
         except subprocess.CalledProcessError as e:
-            print(f"Error starting instance {self.instance_num}: {e}")
+            self.logger.error(f"Error starting instance {self.instance_num}: {e}")
 
     def stop(self):
         try:
@@ -114,9 +116,9 @@ class Instance(IInstance):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            print(f"Instance {self.instance_num} stopped successfully!")
+            self.logger.info(f"Instance {self.instance_num} stopped successfully!")
         except subprocess.CalledProcessError as e:
-            print(f"Error stopping instance {self.instance_num}: {e}")
+            self.logger.error(f"Error stopping instance {self.instance_num}: {e}")
 
     def delete(self):
         try:
@@ -126,9 +128,9 @@ class Instance(IInstance):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-            print(f"Instance {self.instance_num} deleted successfully!")
+            self.logger.info(f"Instance {self.instance_num} deleted successfully!")
         except subprocess.CalledProcessError as e:
-            print(f"Error deleting instance {self.instance_num}: {e}")
+            self.logger.error(f"Error deleting instance {self.instance_num}: {e}")
 
     def flask_url(self):
         return f"http://localhost:{5000 + self.instance_num}"
@@ -160,7 +162,7 @@ def reset_with_callback(instance, callback):
             time.sleep(1)
         callback(instance)
     except Exception as e:
-        print(f"Error in reset worker: {str(e)}")
+        instance.logger.error(f"Error in reset worker: {str(e)}")
 
 
 # got insufficient perf with this method
@@ -171,5 +173,5 @@ def reset_soft_with_callback(instance, callback):
             time.sleep(1)
         callback(instance)
     except Exception as e:
-        print(f"Error in reset worker: {str(e)}")
+        instance.logger.error(f"Error in reset worker: {str(e)}")
 

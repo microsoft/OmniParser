@@ -1,20 +1,20 @@
 import concurrent
 from instance import Instance, reset_with_callback
-#from mock_instance import MockInstance as Instance
+from mock_instance import MockInstance as Instance
 from tqdm import tqdm
 import time
 import uuid
 from typing import Dict, Any
 from pathlib import Path
 import os
-
+from logging_utils import default_logger
 
 class InstanceManager:
-    def __init__(self, path = None, capacity: int = 2):
+    def __init__(self, path = None, capacity: int = 2, logger = None):
         self.capacity = capacity
         self.available_instances = {} # instance_num to instance
         self.in_use = {} # key = instance_uuid, value = instance_id
-
+        self.logger = logger or default_logger()
         self.reset_workers = capacity
         self.reset_executor = concurrent.futures.ThreadPoolExecutor(max_workers=self.reset_workers)
         self.path = Path(path or os.path.dirname(__file__)).resolve()
@@ -34,6 +34,7 @@ class InstanceManager:
             pbar.update(self.capacity - last_count)
 
     def instance_reset_callback(self, instance):
+        self.logger.info(f"Instance {instance.instance_num} is ready")
         self.available_instances[instance.instance_num] = instance
 
     def shutdown(self):
@@ -50,10 +51,12 @@ class InstanceManager:
         return instance_uuid
     
     def reset(self, instance_uuid: str):
+        self.logger.info(f"Resetting instance {instance_uuid}")
         if instance_uuid not in self.in_use:
             return False
         
-        instance = self.in_use[instance_uuid]
+        instance = self.in_use.pop(instance_uuid)
+        self.logger.info(f"Resetting instance {instance_uuid}: {instance.instance_num} ")
         self.reset_executor.submit(reset_with_callback, instance, self.instance_reset_callback)
         return True
     

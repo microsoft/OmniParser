@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from instance import IInstance
 from threading import Thread
+from logging_utils import default_logger
 
 
 def create_app(log_file=None):
@@ -74,25 +75,26 @@ def create_app(log_file=None):
 
 
 class MockInstance(IInstance):
-    def __init__(self, root_path = None, instance_num = 0):
+    def __init__(self, root_path = None, instance_num = 0, logger = None):
         print(f'Creating mock instance: {instance_num}')
         self.root_path = root_path
         self.instance_num = instance_num
         self.app = create_app()
+        self.logger = logger or default_logger()
         p = Thread(target=self.app.run, args=('0.0.0.0',5000 + self.instance_num), daemon=True)
         p.start()
 
     def create(self):
-        print("Dummy instance created")
+        self.logger.info("Dummy instance created")
 
     def start(self):
-        print("Dummy instance started")
+        self.logger.info("Dummy instance started")
 
     def stop(self):
-        print("Dummy instance stopped")
+        self.logger.info("Dummy instance stopped")
 
     def delete(self):
-        print("Dummy instance deleted")
+        self.logger.info("Dummy instance deleted")
 
     def flask_url(self):
         return f"http://localhost:{5000 + self.instance_num}"
@@ -101,7 +103,7 @@ class MockInstance(IInstance):
         return True
     
     def reset(self):
-        print("Dummy instance reset")
+        self.logger.info("Dummy instance reset")
 
     def reset_soft(self):
-        print("Dummy instance reset soft")
+        self.logger.info("Dummy instance reset soft")
