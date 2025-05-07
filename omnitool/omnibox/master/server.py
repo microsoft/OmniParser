@@ -57,7 +57,9 @@ async def reset(instance_id: str, node: str):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Node {node} is not found"
         )
-    return requests.post(f'{node_info.url}/reset', params={"instance_id": instance_id})
+    response = requests.post(f'{node_info.url}/reset', params={"instance_id": instance_id})
+    return JSONResponse(content=response.json(), status_code=response.status_code)
+
 
 @app.get("/probe")
 async def probe(instance_id: str, node: str):
