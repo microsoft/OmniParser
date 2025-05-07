@@ -142,7 +142,7 @@ class NodeClient:
         self.instance_id = None
 
     def get_instance(self):
-        data = requests.post(f'http://{self.host}:{self.port}/getinstance')
+        data = requests.post(f'http://{self.host}:{self.port}/instances/get')
         instance_id = data.json()['instance_uuid']
         return instance_id
     
@@ -151,18 +151,18 @@ class NodeClient:
         return data.json()    
     
     def reset_instance(self, instance_id):
-        data = requests.post(f'http://{self.host}:{self.port}/resetinstance/{instance_id}')
+        data = requests.post(f'http://{self.host}:{self.port}/instances/{instance_id}/reset')
         if data.status_code != 200:
             raise Exception(f"Error: {data.status_code} - {data.text}")
         return data.json()
 
     def screenshot(self, instance_id):
-        data = requests.get(f'http://{self.host}:{self.port}/executeinstance/{instance_id}/screenshot')
+        data = requests.get(f'http://{self.host}:{self.port}/instances/{instance_id}/screenshot')
         image_data = io.BytesIO(data.content)
         return Image.open(image_data)
 
     def execute(self, instance_id, command):
-        return requests.post(f'http://{self.host}:{self.port}/executeinstance/{instance_id}/execute', json = command)
+        return requests.post(f'http://{self.host}:{self.port}/instances/{instance_id}/execute', json = command)
     
     def do_and_show(self, instance_id, command, waitTime):
         response = self.execute(instance_id, command)

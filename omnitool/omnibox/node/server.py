@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.post("/getinstance")
+@app.post("/instances/get")
 def get_instance():
     """Get an available instance from the pool"""
     instance_uuid = instance_manager.start()
@@ -33,14 +33,14 @@ def get_instance():
         raise HTTPException(status_code=503, detail="No instances available")
     return {"instance_uuid": instance_uuid}
 
-@app.post("/resetinstance/{instance_uuid}")
+@app.post("/instances/{instance_uuid}/reset")
 def reset_instance(instance_uuid: str):
     """Reset an instance to its initial state and make it available again"""
     if instance_manager.reset(instance_uuid):
         return {"status": "success", "message": f"UUID {instance_uuid} for instance has been queued for reset"}
     raise HTTPException(status_code=400, detail=f"Invalid instance UUID: {instance_uuid}")
 
-@app.post("/executeinstance/{instance_uuid}/execute")
+@app.post("/instances/{instance_uuid}/execute")
 async def execute_instance_command(instance_uuid: str, command_data: Dict[str, Any]):
     """Forward execute command to the Flask server in the specified instance"""
     instance= instance_manager.get(instance_uuid)
@@ -51,7 +51,7 @@ async def execute_instance_command(instance_uuid: str, command_data: Dict[str, A
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error communicating with instance {instance.instance_num}: {str(e)}")
 
-@app.get("/executeinstance/{instance_uuid}/screenshot")
+@app.get("/instances/{instance_uuid}/screenshot")
 async def get_instance_screenshot(instance_uuid: str):
     """Forward screenshot request to the Flask server in the specified instance"""
     instance = instance_manager.get(instance_uuid)
@@ -62,7 +62,7 @@ async def get_instance_screenshot(instance_uuid: str):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error communicating with UUID {instance_uuid} for instance {instance.instance_num}: {str(e)}")
 
-@app.get("/executeinstance/{instance_uuid}/probe")
+@app.get("/instances/{instance_uuid}/probe")
 async def probe_instance(instance_uuid: str):
     """Forward probe request to the Flask server in the specified instance"""
     instance= instance_manager.get(instance_uuid)
