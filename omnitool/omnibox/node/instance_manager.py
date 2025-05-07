@@ -1,6 +1,5 @@
 import concurrent
 from instance import Instance, reset_with_callback
-from mock_instance import MockInstance as Instance
 from tqdm import tqdm
 import time
 import uuid
@@ -10,8 +9,9 @@ import os
 from logging_utils import default_logger
 
 class InstanceManager:
-    def __init__(self, path = None, capacity: int = 2, logger = None):
+    def __init__(self, instance_factory = None, path = None, capacity: int = 2, logger = None):
         self.capacity = capacity
+        self.instance_factory = instance_factory or Instance
         self.available_instances = {} # instance_num to instance
         self.in_use = {} # key = instance_uuid, value = instance_id
         self.logger = logger or default_logger()
@@ -20,7 +20,7 @@ class InstanceManager:
         self.path = Path(path or os.path.dirname(__file__)).resolve()
 
         for i in range(self.capacity):
-            self.reset_executor.submit(reset_with_callback, Instance(self.path, instance_num=i), self.instance_reset_callback)
+            self.reset_executor.submit(reset_with_callback, self.instance_factory(self.path, instance_num=i), self.instance_reset_callback)
 
         # Wait for all instances to be initialized
         with tqdm(total=self.capacity, desc="Initializing instances") as pbar:
