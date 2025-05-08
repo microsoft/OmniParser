@@ -13,11 +13,13 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description="OmniBox Host")
 parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
 parser.add_argument('--path', type=str, default='../run', help="Path to the instance directory. Expected to contain prepared common subfolder")
+parser.add_argument('--base_control_port', type=int, default=5000, help="Base control port offset for the instances (for testing with mock instances)")
 parser.add_argument('--mock', action='store_true', help="Use mock instances")
 args = parser.parse_args()
 
 Path(args.path).mkdir(parents=True, exist_ok=True)
-instance_factory = MockInstance if args.mock else Instance
+mock_instance_factory = lambda root_path, instance_num, logger: MockInstance(root_path, instance_num, logger, args.base_control_port)
+instance_factory = mock_instance_factory if args.mock else Instance
 instance_manager = InstanceManager(instance_factory = instance_factory, path = args.path)
 
 @asynccontextmanager

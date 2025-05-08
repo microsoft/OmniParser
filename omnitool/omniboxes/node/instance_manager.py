@@ -20,7 +20,7 @@ class InstanceManager:
         self.path = Path(path or os.path.dirname(__file__)).resolve()
 
         for i in range(self.capacity):
-            self.reset_executor.submit(reset_with_callback, self.instance_factory(self.path, instance_num=i), self.instance_reset_callback)
+            self.reset_executor.submit(reset_with_callback, self.instance_factory(self.path, instance_num=i, logger=self.logger), self.instance_reset_callback)
 
         # Wait for all instances to be initialized
         with tqdm(total=self.capacity, desc="Initializing instances") as pbar:

@@ -76,14 +76,19 @@ class MockApp:
 
 
 class MockInstance(IInstance):
-    def __init__(self, root_path = None, instance_num = 0, logger = None):
+    def __init__(self, root_path = None, instance_num = 0, logger = None, base_control_port = 5000):
         print(f'Creating mock instance: {instance_num}')
         self.root_path = root_path
         self.instance_num = instance_num
         self.app = MockApp()
         self.logger = logger or default_logger()
-        p = Thread(target=self.app.app.run, args=('0.0.0.0',5000 + self.instance_num), daemon=True)
+        self.base_control_port = base_control_port
+        p = Thread(target=self.app.app.run, args=('0.0.0.0', self.control_port), daemon=True)
         p.start()
+
+    @property
+    def control_port(self):
+        return self.base_control_port + self.instance_num
 
     def create(self):
         self.logger.info(f"Creating dummy instance {self.instance_num}")
@@ -98,7 +103,7 @@ class MockInstance(IInstance):
         self.logger.info(f"Deleting dummy instance {self.instance_num}")
 
     def flask_url(self):
-        return f"http://localhost:{5000 + self.instance_num}"
+        return f"http://localhost:{self.control_port}"
 
     def is_ready(self):
         return True
