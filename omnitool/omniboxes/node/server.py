@@ -12,7 +12,7 @@ from pathlib import Path
 
 parser = argparse.ArgumentParser(description="OmniBox Host")
 parser.add_argument("--port", type=int, default=8000, help="Port to run the server on")
-parser.add_argument('--path', type=str, default='/home/azureuser/ataymano/OmniParser/omnitool/omnibox/run1', help="Path to the instance directory. Expected to contain prepared common subfolder")
+parser.add_argument('--path', type=str, default='../run', help="Path to the instance directory. Expected to contain prepared common subfolder")
 parser.add_argument('--mock', action='store_true', help="Use mock instances")
 args = parser.parse_args()
 

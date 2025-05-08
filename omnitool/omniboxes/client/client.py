@@ -41,24 +41,26 @@ def _doubleClick():
         ])
     }
 
-def _position():
+def _position(ignore_by_mock = True):
     return {
         'command': _pyscript([
             'import pyautogui',
             'import json',
             'p = pyautogui.position()',
             "print(json.dumps({'x': p.x, 'y': p.y}))",       
-        ])
+        ]),
+        'ignore_by_mock': ignore_by_mock
     }
 
-def _screensize():
+def _screensize(ignore_by_mock = True):
     return {
         'command': _pyscript([
             'import pyautogui',
             'import json',
             'sz = pyautogui.size()',
             "print(json.dumps({'width': sz.width, 'height': sz.height}))",       
-        ])
+        ]),
+        'ignore_by_mock': ignore_by_mock
     }
 
 
@@ -142,9 +144,8 @@ class NodeClient:
         self.instance_id = None
 
     def get_instance(self):
-        data = requests.post(f'http://{self.host}:{self.port}/get')
-        instance_id = data.json()['instance_id']
-        return instance_id
+        data = requests.post(f'http://{self.host}:{self.port}/get').json()
+        return data.get('instance_id', None)
     
     def get_instances_info(self):
         data = requests.get(f'http://{self.host}:{self.port}/info')
@@ -194,14 +195,17 @@ class NodeClient:
         instances = ipywidgets.RadioButtons(description = 'Instances', options = self.get_instances_info()['in_use'], layout=ipywidgets.Layout(width='50%'))
         self.instance_id = instances.value
         def on_add_click(b):
-            self.get_instance()
-            info = self.get_instances_info()
-            instances.options = info['in_use']
+            instance_id = self.get_instance()
+            if instance_id:
+                instances.options = list(instances.options) + [instance_id]
+            else:
+                print('No instance available')
 
         def on_release_click(b):
             self.reset_instance(instances.value)
-            info = self.get_instances_info()
-            instances.options = info['in_use']        
+            options = list(instances.options)
+            options.remove(instances.value)
+            instances.options = options       
 
         get_button.on_click(on_add_click)
         release_button.on_click(on_release_click)        

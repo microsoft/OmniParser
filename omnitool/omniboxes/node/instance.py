@@ -80,54 +80,41 @@ class Instance(IInstance):
             )
             temp_file.write(compose_content)
 
+    def path(self):
+        return f"{self.root_path}/omnibox-{self.instance_num}/"
+
+    def _execute(self, command):
+        self.logger.info(f'Running: {" ".join(command)}')
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def create(self):
-        if not os.path.exists(f"omnibox-{self.instance_num}"):
+        if not os.path.exists(self.path()):
             os.makedirs(f"omnibox-{self.instance_num}")
-            subprocess.run(["cp", "-r", f"{str(self.root_path)}/common/win11storage/.", f"{self.root_path}/omnibox-{self.instance_num}/"])
+            subprocess.run(["cp", "-r", f"{str(self.root_path)}/common/win11storage/.", self.path()])
 
         try:
-            subprocess.run(
-                ["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "up", "-d"],
-                check=True,
-                stdout=subprocess.DEVNULL,  # Suppress standard output
-                stderr=subprocess.DEVNULL   # Suppress error output
-            )
+            self._execute(["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "up", "-d"])
             self.logger.info(f"Instance {self.instance_num} launched successfully!")
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error launching instance {self.instance_num}: {e}")
 
     def start(self):
         try:
-            subprocess.run(
-                ["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "start"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            self._execute(["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "start"])
             self.logger.info(f"Instance {self.instance_num} started successfully!")
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error starting instance {self.instance_num}: {e}")
 
     def stop(self):
         try:
-            subprocess.run(
-                ["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "stop"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            self._execute(["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "stop"])
             self.logger.info(f"Instance {self.instance_num} stopped successfully!")
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error stopping instance {self.instance_num}: {e}")
 
     def delete(self):
         try:
-            subprocess.run(
-                ["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "down"],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            self._execute(["docker", "compose", "-f", str(self.config_path), "-p", f"omnibox-{self.instance_num}", "down"])
             self.logger.info(f"Instance {self.instance_num} deleted successfully!")
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error deleting instance {self.instance_num}: {e}")
@@ -144,13 +131,13 @@ class Instance(IInstance):
 
     def reset(self):
         self.delete()
-        if os.path.exists(f"omnibox-{self.instance_num}"):
+        if os.path.exists(self.path()):
             subprocess.run(["sudo", "rm", "-rf", f"{self.root_path}/omnibox-{self.instance_num}"], check=True)
         self.create()
 
     def reset_soft(self):
         self.stop()
-        if os.path.exists(f"omnibox-{self.instance_num}"):
+        if os.path.exists(self.path()):
             subprocess.run(["sudo", "rm", "-rf", f"{self.root_path}/omnibox-{self.instance_num}"], check=True)
         self.start()
 

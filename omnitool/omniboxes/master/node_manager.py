@@ -38,7 +38,7 @@ def _default_logger():
 
 
 class NodeManager:
-    def __init__(self, logger = None, update_timeout: int = 60):
+    def __init__(self, logger = None, update_timeout: int = 10):
         self._nodes = {}
         self._node_info = {}
         self.logger = logger or _default_logger()

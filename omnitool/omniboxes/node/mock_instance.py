@@ -25,7 +25,8 @@ class MockApp:
         def execute_command():
             data = request.json
             command = data.get('command', "")
-            self.command_history.append(str(command))
+            if not data.get('ignore_by_mock', False):
+                self.command_history.append(str(command))
             return jsonify({
                 'status': 'success',
                 'output': '{}',
@@ -85,16 +86,16 @@ class MockInstance(IInstance):
         p.start()
 
     def create(self):
-        self.logger.info("Dummy instance created")
+        self.logger.info(f"Creating dummy instance {self.instance_num}")
 
     def start(self):
-        self.logger.info("Dummy instance started")
+        self.logger.info(f"Starting dummy instance {self.instance_num}")
 
     def stop(self):
-        self.logger.info("Dummy instance stopped")
+        self.logger.info(f"Stopping dummy instance {self.instance_num}")
 
     def delete(self):
-        self.logger.info("Dummy instance deleted")
+        self.logger.info(f"Deleting dummy instance {self.instance_num}")
 
     def flask_url(self):
         return f"http://localhost:{5000 + self.instance_num}"
@@ -104,7 +105,7 @@ class MockInstance(IInstance):
     
     def reset(self):
         self.app.command_history = []
-        self.logger.info("Dummy instance reset")
+        self.logger.info(f"Resetting dummy instance {self.instance_num}")
 
     def reset_soft(self):
-        self.logger.info("Dummy instance reset soft")
+        self.logger.info(f"Soft resetting dummy instance {self.instance_num}")

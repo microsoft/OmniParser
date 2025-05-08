@@ -23,7 +23,8 @@ node_manager = NodeManager(logger = logger)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await node_manager.register_node(NodeRegistration(url = "http://localhost:8000"))
-    task = asyncio.create_task(node_manager.update_statuses_worker())
+#    await node_manager.register_node(NodeRegistration(url = "http://localhost:8001"))
+    tasks = asyncio.create_task(node_manager.update_statuses_worker())
     yield
     # Shutdown code goes here
 
@@ -34,6 +35,7 @@ app = FastAPI(
 
 @app.post("/get")
 def create_instance():
+    """Get an available new instance from less occupied node"""
     node = node_manager.get_best_node()
     if node is None:
         raise HTTPException(
@@ -41,12 +43,16 @@ def create_instance():
             detail="No available nodes with capacity to create new instance"
         )
     
-    data = requests.post(f'{node.url}/get')
-    instance_id = data.json()['instance_id']
-    return {
-        'instance_id': instance_id,
-        'node': node.hash,
-    }
+    data = requests.post(f'{node.url}/get').json()
+    if 'instance_id' in data:
+        return {
+            'instance_id': data['instance_id'],
+            'node': node.hash,
+        }
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="No available nodes with capacity to create new instance"
+    )
 
 @app.post("/reset")
 async def reset(instance_id: str, node: str):
@@ -63,7 +69,7 @@ async def reset(instance_id: str, node: str):
 
 @app.get("/probe")
 async def probe(instance_id: str, node: str):
-    """Reset an existing instance by delegating to the worker node that hosts it"""
+    """Probe the instance by delegating to the worker node that hosts it"""
     node_info = node_manager.get_node(node)
     if node_info is None:
         raise HTTPException(
