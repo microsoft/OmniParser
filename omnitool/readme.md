@@ -54,7 +54,7 @@ There are three components:
 
    c. Navigate to the root of the repo with `cd OmniParser`
 
-   d. Create a conda python environment with `conda create -n "omni" python==3.12`
+   d. Create a conda python environment with `conda create -n "omni" python==3.11`
 
    e. Set the python environment to be used with `conda activate omni`
 
@@ -90,10 +90,14 @@ There are three components:
 
 
 > [!note] You can now create and manage a Linux VM, use the script with commands like:
+> 
 > `./manage_vm.sh create --linux` to create a Linux VM
 > `./manage_vm.sh start --linux` to start a Linux VM
 > `./manage_vm.sh create` to create a Windows VM (default)
 > `./manage_vm.sh stop --windows` to explicitly stop a Windows VM
+
+In macOS you may need to turn off _Airplay Receiver_ to avoid conflicts with Omnibox running on port `5000`, see this [Stack Overflow thread for more](https://stackoverflow.com/questions/72369320/why-always-something-is-running-at-port-5000-on-my-mac).
+
 
 3. **gradio**:
 
