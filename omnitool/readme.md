@@ -54,7 +54,7 @@ There are three components:
 
    c. Navigate to the root of the repo with `cd OmniParser`
 
-   d. Create a conda python environment with `conda create -n "omni" python==3.11`
+   d. Create a conda python environment with `conda create -n "omni" python==3.12`
 
    e. Set the python environment to be used with `conda activate omni`
 
@@ -99,7 +99,7 @@ There are three components:
 In macOS you may need to turn off _Airplay Receiver_ to avoid conflicts with Omnibox running on port `5000`, see this [Stack Overflow thread for more](https://stackoverflow.com/questions/72369320/why-always-something-is-running-at-port-5000-on-my-mac).
 
 
-3. **gradio**:
+1. **gradio**:
 
    a. Navigate to the gradio directory with `cd OmniParser/omnitool/gradio`
 
