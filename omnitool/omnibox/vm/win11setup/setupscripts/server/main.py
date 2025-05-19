@@ -33,20 +33,30 @@ def execute_command():
     with computer_control_lock:
         data = request.json
         # The 'command' key in the JSON request should contain the command to be executed.
-        shell = data.get('shell', False)
-        command = data.get('command', "" if shell else [])
+        ALLOWLIST = {
+            "ls": ["-l", "-a", "-h"],
+            "echo": [],
+            "cat": []
+        }
 
-        if isinstance(command, str) and not shell:
-            command = shlex.split(command)
+        command = data.get('command', [])
+        if not isinstance(command, list) or len(command) == 0:
+            return jsonify({'status': 'error', 'message': 'Invalid command format'}), 400
+
+        # Validate command against allowlist
+        executable = command[0]
+        args = command[1:]
+        if executable not in ALLOWLIST or any(arg not in ALLOWLIST[executable] for arg in args):
+            return jsonify({'status': 'error', 'message': 'Command not allowed'}), 403
 
         # Expand user directory
         for i, arg in enumerate(command):
             if arg.startswith("~/"):
                 command[i] = os.path.expanduser(arg)
 
-        # Execute the command without any safety checks.
+        # Execute the validated command
         try:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, text=True, timeout=120)
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=False, text=True, timeout=120)
             return jsonify({
                 'status': 'success',
                 'output': result.stdout,
