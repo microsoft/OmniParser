@@ -423,4 +423,4 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     stop_button.click(stop_app, [state], None)
     
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7888)
+    demo.launch(server_name="127.0.0.1", server_port=7888)
