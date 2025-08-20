@@ -757,4 +757,4 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     gr.HTML("<script>(" + js_refresh + ")();</script>")
     
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7888)
+    demo.launch(server_name="127.0.0.1", server_port=7888)
