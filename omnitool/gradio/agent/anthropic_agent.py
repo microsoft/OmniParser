@@ -39,7 +39,7 @@ class APIProvider(StrEnum):
     VERTEX = "vertex"
 
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-* You are utilizing a Windows system with internet access.
+* You are utilizing a {platform.system()} system with internet access.
 * The current date is {datetime.today().strftime('%A, %B %d, %Y')}.
 </SYSTEM_CAPABILITY>
 """
@@ -47,6 +47,7 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 class AnthropicActor:
     def __init__(
         self, 
+        args,
         model: str, 
         provider: APIProvider,
         api_key: str,
@@ -62,7 +63,7 @@ class AnthropicActor:
         self.max_tokens = max_tokens
         self.only_n_most_recent_images = only_n_most_recent_images
         
-        self.tool_collection = ToolCollection(ComputerTool())
+        self.tool_collection = ToolCollection(ComputerTool(args=args))
 
         self.system = SYSTEM_PROMPT
         

@@ -1,4 +1,4 @@
-from util.utils import get_som_labeled_img, get_caption_model_processor, get_yolo_model, check_ocr_box
+from util.utils import get_som_labeled_img, get_caption_model_processor, get_yolo_model, check_ocr_box, detect_device
 import torch
 from PIL import Image
 import io
@@ -7,7 +7,7 @@ from typing import Dict
 class Omniparser(object):
     def __init__(self, config: Dict):
         self.config = config
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        device = detect_device()
 
         self.som_model = get_yolo_model(model_path=config['som_model_path'])
         self.caption_model_processor = get_caption_model_processor(model_name=config['caption_model_name'], model_name_or_path=config['caption_model_path'], device=device)
