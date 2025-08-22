@@ -88,7 +88,18 @@ There are three components:
 
    f. After creating the first time it will store a save of the VM state in `vm/win11storage`. You can then manage the VM with `./manage_vm.sh start` and `./manage_vm.sh stop`. To delete the VM, use `./manage_vm.sh delete` and delete the `OmniParser/omnitool/omnibox/vm/win11storage` directory.
 
-3. **gradio**:
+
+> [!note] You can now create and manage a Linux VM, use the script with commands like:
+> 
+> `./manage_vm.sh create --linux` to create a Linux VM
+> `./manage_vm.sh start --linux` to start a Linux VM
+> `./manage_vm.sh create` to create a Windows VM (default)
+> `./manage_vm.sh stop --windows` to explicitly stop a Windows VM
+
+In macOS you may need to turn off _Airplay Receiver_ to avoid conflicts with Omnibox running on port `5000`, see this [Stack Overflow thread for more](https://stackoverflow.com/questions/72369320/why-always-something-is-running-at-port-5000-on-my-mac).
+
+
+1. **gradio**:
 
    a. Navigate to the gradio directory with `cd OmniParser/omnitool/gradio`
 
