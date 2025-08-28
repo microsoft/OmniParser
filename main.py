@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from typing import Optional
 import torch
 from PIL import Image
@@ -7,6 +7,7 @@ import base64
 import os
 from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 
+# This line is still needed for Kaggle environments
 os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 # Initialize models
@@ -17,9 +18,10 @@ DEVICE = torch.device('cuda')
 app = FastAPI(title="OmniParser API")
 
 def process_image(image: Image.Image, box_threshold: float, iou_threshold: float, 
-      use_paddleocr: bool, imgsz: int) -> tuple[Image.Image, str]:
+      use_paddleocr: bool, imgsz: int) -> str:
     """
-    Process the image and return the annotated image and parsed elements.
+    Process the image and return the parsed elements as a string.
+    This is the same core logic as your Gradio app's process function.
     """
     box_overlay_ratio = image.size[0] / 3200
     draw_bbox_config = {
@@ -34,7 +36,8 @@ def process_image(image: Image.Image, box_threshold: float, iou_threshold: float
       'text_threshold': 0.9}, use_paddleocr=use_paddleocr)
     text, ocr_bbox = ocr_bbox_rslt
 
-    dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(
+    # We only need the parsed content list, not the annotated image.
+    _, _, parsed_content_list = get_som_labeled_img(
         image, yolo_model, BOX_TRESHOLD=box_threshold, output_coord_in_ratio=True,
       ocr_bbox=ocr_bbox,
         draw_bbox_config=draw_bbox_config,
@@ -42,50 +45,29 @@ def process_image(image: Image.Image, box_threshold: float, iou_threshold: float
         iou_threshold=iou_threshold, imgsz=imgsz
     )
 
-    # --- ADD THIS DEFENSIVE CODE BLOCK ---
-    # If the model returns an empty string for the image, it means nothing was detected.
-    if not dino_labled_img:
-        print("Warning: get_som_labeled_img returned an empty image string. No objects were detected.")
-        # Return the original image and an empty string for the content.
-        return image, ""
-    # --- END OF DEFENSIVE CODE BLOCK ---
+    parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate(parsed_content_list)])
 
-    annotated_image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
-
-    parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate
-      (parsed_content_list)])
-
-    return annotated_image, parsed_content_str
+    return parsed_content_str
 
 @app.post("/process")
 async def process_endpoint(
     file: UploadFile = File(...),
-    box_threshold: float = 0.05,
-    iou_threshold: float = 0.1,
-    use_paddleocr: bool = True,
-    imgsz: int = 640
+    box_threshold: float = Form(...), # This forces FastAPI to read the value from the client
+    iou_threshold: float = Form(...), # This forces FastAPI to read the value from the client
+    use_paddleocr: bool = Form(...),  # This forces FastAPI to read the value from the client
+    imgsz: int = Form(...)            # This forces FastAPI to read the value from the client
 ):
     """
-    Endpoint to upload an image and get parsed elements.
+    Endpoint to upload an image and get parsed elements as JSON.
     """
     try:
-        # Read the uploaded image
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-        # Process the image
-        annotated_image, parsed_content = process_image(image, box_threshold, iou_threshold, use_paddleocr, imgsz)
+        # This will now correctly use the low thresholds sent by your script
+        parsed_content = process_image(image, box_threshold, iou_threshold, use_paddleocr, imgsz)
 
-        # Convert annotated image to bytes for return
-        img_byte_arr = io.BytesIO()
-        annotated_image.save(img_byte_arr, format='PNG')
-        img_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-
-        # Return JSON response with image and parsed content
-        return {
-            "annotated_image": img_base64,
-            "parsed_elements": parsed_content
-        }
+        return { "parsed_elements": parsed_content }
     except Exception as e:
         return {"error": str(e)}
 
