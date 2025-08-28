@@ -7,6 +7,8 @@ import base64
 import os
 from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
 # Initialize models
 yolo_model = get_yolo_model(model_path='weights/icon_detect/model.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
