@@ -16,7 +16,8 @@ DEVICE = torch.device('cuda')
 
 app = FastAPI(title="OmniParser API")
 
-def process_image(image: Image.Image, box_threshold: float, iou_threshold: float, use_paddleocr: bool, imgsz: int) -> tuple[Image.Image, str]:
+def process_image(image: Image.Image, box_threshold: float, iou_threshold: float, 
+      use_paddleocr: bool, imgsz: int) -> tuple[Image.Image, str]:
     """
     Process the image and return the annotated image and parsed elements.
     """
@@ -28,15 +29,32 @@ def process_image(image: Image.Image, box_threshold: float, iou_threshold: float
         'thickness': max(int(3 * box_overlay_ratio), 1),
     }
 
-    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image, display_img=False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold': 0.9}, use_paddleocr=use_paddleocr)
+    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image, display_img=False,
+      output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False,
+      'text_threshold': 0.9}, use_paddleocr=use_paddleocr)
     text, ocr_bbox = ocr_bbox_rslt
+
     dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(
-        image, yolo_model, BOX_TRESHOLD=box_threshold, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,
-        draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,
+        image, yolo_model, BOX_TRESHOLD=box_threshold, output_coord_in_ratio=True,
+      ocr_bbox=ocr_bbox,
+        draw_bbox_config=draw_bbox_config,
+      caption_model_processor=caption_model_processor, ocr_text=text,
         iou_threshold=iou_threshold, imgsz=imgsz
     )
+
+    # --- ADD THIS DEFENSIVE CODE BLOCK ---
+    # If the model returns an empty string for the image, it means nothing was detected.
+    if not dino_labled_img:
+        print("Warning: get_som_labeled_img returned an empty image string. No objects were detected.")
+        # Return the original image and an empty string for the content.
+        return image, ""
+    # --- END OF DEFENSIVE CODE BLOCK ---
+
     annotated_image = Image.open(io.BytesIO(base64.b64decode(dino_labled_img)))
-    parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate(parsed_content_list)])
+
+    parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate
+      (parsed_content_list)])
+
     return annotated_image, parsed_content_str
 
 @app.post("/process")
