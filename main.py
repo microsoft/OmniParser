@@ -1,110 +1,75 @@
-import os
-import sys
-import io
-import traceback
+from fastapi import FastAPI, UploadFile, File, Form
+from typing import Optional
+import torch
 from PIL import Image
-from fastapi import FastAPI, File, UploadFile, Form
-from fastapi.responses import JSONResponse
+import io
+import base64
+import os
+from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processor, get_som_labeled_img
 
-# Add the parent directory of 'util' to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# This line is still needed for Kaggle environments
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
-from util.omniparser import get_som_labeled_img, initialize_models
-from util.utils import check_ocr_box
+# Initialize models
+yolo_model = get_yolo_model(model_path='weights/icon_detect/model.pt')
+caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
+DEVICE = torch.device('cuda')
 
-# --- Initialize Models ---
-# It's better to initialize models once when the application starts
-yolo_model, caption_model_processor = initialize_models()
+app = FastAPI(title="OmniParser API")
 
-app = FastAPI()
-
-def process_image_with_logging(image, box_threshold, iou_threshold, use_paddleocr, imgsz):
+def process_image(image: Image.Image, box_threshold: float, iou_threshold: float, 
+      use_paddleocr: bool, imgsz: int) -> str:
     """
-    This function contains the core image processing logic.
-    It's designed to be testable and to log every step.
+    Process the image and return the parsed elements as a string.
+    This is the same core logic as your Gradio app's process function.
     """
-    log = ["--- Inside process_image_with_logging ---"]
-    try:
-        log.append(f"Step 1: Received parameters: box_threshold={box_threshold}, iou_threshold={iou_threshold}, use_paddleocr={use_paddleocr}, imgsz={imgsz}")
+    box_overlay_ratio = image.size[0] / 3200
+    draw_bbox_config = {
+        'text_scale': 0.8 * box_overlay_ratio,
+        'text_thickness': max(int(2 * box_overlay_ratio), 1),
+        'text_padding': max(int(3 * box_overlay_ratio), 1),
+        'thickness': max(int(3 * box_overlay_ratio), 1),
+    }
 
-        # --- OCR Check Case ---
-        log.append("Step 2: Starting OCR check...")
-        ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image, display_img=False,
-          output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False,
-          'text_threshold': 0.9}, use_paddleocr=use_paddleocr)
-        text, ocr_bbox = ocr_bbox_rslt
-        log.append(f"Step 3: OCR check complete. Found {len(text)} text elements.")
+    ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image, display_img=False,
+      output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False,
+      'text_threshold': 0.9}, use_paddleocr=use_paddleocr)
+    text, ocr_bbox = ocr_bbox_rslt
 
-        # --- Main Model Case ---
-        log.append("Step 4: Starting main model (get_som_labeled_img)...")
-        _, _, parsed_content_list = get_som_labeled_img(
-            image, yolo_model, BOX_TRESHOLD=box_threshold, output_coord_in_ratio=True,
-            ocr_bbox=ocr_bbox, draw_bbox_config={}, # draw_bbox_config is not needed for data-only output
-            caption_model_processor=caption_model_processor, ocr_text=text,
-            iou_threshold=iou_threshold, imgsz=imgz
-        )
-        log.append(f"Step 5: Main model finished. It returned a list with {len(parsed_content_list)} elements.")
+    # We only need the parsed content list, not the annotated image.
+    _, _, parsed_content_list = get_som_labeled_img(
+        image, yolo_model, BOX_TRESHOLD=box_threshold, output_coord_in_ratio=True,
+      ocr_bbox=ocr_bbox,
+        draw_bbox_config=draw_bbox_config,
+      caption_model_processor=caption_model_processor, ocr_text=text,
+        iou_threshold=iou_threshold, imgsz=imgsz
+    )
 
-        # --- Final Formatting Case ---
-        if not parsed_content_list:
-            log.append("WARNING: The final list of elements is empty. The model did not detect any objects that met the criteria.")
+    parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate(parsed_content_list)])
 
-        parsed_content_str = '\n'.join([f'icon {i}: ' + str(v) for i, v in enumerate(parsed_content_list)])
-        log.append("Step 6: Successfully formatted the final list into a string.")
-
-        return parsed_content_str, log
-
-    except Exception as e:
-        log.append(f"\n!!!!!! AN ERROR OCCURRED INSIDE process_image_with_logging !!!!!!")
-        log.append(f"Error Type: {type(e)}")
-        log.append(f"Error Message: {str(e)}")
-        log.append("--- Full Traceback ---")
-        log.append(traceback.format_exc())
-        return "", log # Return an empty string but the full log of the crash
+    return parsed_content_str
 
 @app.post("/process")
 async def process_endpoint(
     file: UploadFile = File(...),
-    box_threshold: float = Form(...),
-    iou_threshold: float = Form(...),
-    use_paddleocr: bool = Form(...),
-    imgsz: int = Form(...)
+    box_threshold: float = Form(...), # This forces FastAPI to read the value from the client
+    iou_threshold: float = Form(...), # This forces FastAPI to read the value from the client
+    use_paddleocr: bool = Form(...),  # This forces FastAPI to read the value from the client
+    imgsz: int = Form(...)            # This forces FastAPI to read the value from the client
 ):
     """
-    This endpoint now acts as a "black box recorder".
-    It logs everything and returns the log in the response.
+    Endpoint to upload an image and get parsed elements as JSON.
     """
-    master_log = ["--- Server received request in process_endpoint ---"]
     try:
-        # --- Parameter Reception Case ---
-        master_log.append(f"Received box_threshold: {box_threshold} (type: {type(box_threshold)})")
-        master_log.append(f"Received iou_threshold: {iou_threshold} (type: {type(iou_threshold)})")
-        master_log.append(f"Received use_paddleocr: {use_paddleocr} (type: {type(use_paddleocr)})")
-        master_log.append(f"Received imgsz: {imgsz} (type: {type(imgsz)})")
-
-        # --- Image Loading Case ---
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        master_log.append(f"Image successfully loaded. Size: {image.size}")
 
-        # --- Call Core Logic Case ---
-        parsed_content, function_log = process_image_with_logging(image, box_threshold, iou_threshold, use_paddleocr, imgsz)
-        master_log.extend(function_log) # Add the detailed log from the function
+        # This will now correctly use the low thresholds sent by your script
+        parsed_content = process_image(image, box_threshold, iou_threshold, use_paddleocr, imgsz)
 
-        master_log.append("\n--- FINAL SUMMARY ---")
-        master_log.append(f"Final content string length: {len(parsed_content)}")
-
-        # We will return the log itself for debugging
-        return { "debug_log": "\n".join(master_log), "parsed_elements": parsed_content }
-
+        return { "parsed_elements": parsed_content }
     except Exception as e:
-        master_log.append(f"\n!!!!!! AN UNEXPECTED ERROR OCCURRED IN process_endpoint !!!!!!")
-        master_log.append(f"Error Type: {type(e)}")
-        master_log.append(f"Error Message: {str(e)}")
-        master_log.append("--- Full Traceback ---")
-        master_log.append(traceback.format_exc())
-
-        return { "debug_log": "\n".join(master_log), "parsed_elements": "" }
+        return {"error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
