@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+omniparser.egg-info/PKG-INFO
+omniparser.egg-info/SOURCES.txt
+omniparser.egg-info/dependency_links.txt
+omniparser.egg-info/requires.txt
+omniparser.egg-info/top_level.txt
+util/__init__.py
+util/box_annotator.py
+util/omniparser.py
+util/utils.py

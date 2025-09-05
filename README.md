@@ -61,6 +61,92 @@ To run gradio demo, simply run:
 python gradio_demo.py
 ```
 
+## FastAPI Server (for integration)
+An HTTP API wrapper is available for running OmniParser as a service with a response format compatible with the Minecraft Action Model loop.
+
+Run the server (models auto-install on first run if missing):
+```
+python fastapi_server.py --device cuda --BOX_TRESHOLD 0.05 --host 0.0.0.0 --port 8510
+python fastapi_server.py --som_model_path weights/icon_detect/model.pt --caption_model_name florence2 --caption_model_path weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05 --host 0.0.0.0 --port 8510
+```
+
+Parse an image (multipart or JSON):
+```
+curl -F "image=@OmniParser/imgs/omni3.jpg" http://localhost:8510/parse
+```
+
+```
+curl -X POST http://localhost:8510/parse \
+  -H "Content-Type: application/json" \
+  -d '{ "image_base64": "data:image/png;base64,..." }'
+```
+
+API endpoints
+- `POST /parse`: parse image, returns `{ annotated_image_base64, annotation_list }`
+- `GET /health`: readiness probe
+- `GET /config`: current model configuration
+
+Notes
+- If the specified `som_model_path` or `caption_model_path` does not exist, the server downloads the appropriate files from `microsoft/OmniParser-v2.0` using Hugging Face Hub and updates the effective paths in `/config`.
+- Requires network access for first-run downloads.
+
+## Install with uv (CPU/GPU)
+If you prefer `uv` over `conda`/`pip`, the project is configured with optional dependency groups for CPU and GPU installs via `pyproject.toml` extras: `cpu` and `gpu`.
+
+Prereqs
+- Python 3.10+ and `uv` installed (`pipx install uv` or see uv docs).
+
+Create and activate a virtualenv
+```
+uv venv
+source .venv/bin/activate
+```
+
+Base install (no heavy frameworks)
+```
+uv sync
+```
+
+CPU stack
+```
+uv pip install '.[cpu]'
+```
+Optionally lock then sync
+```
+uv lock --extra cpu
+uv sync
+```
+
+GPU stack (CUDA)
+- Choose your CUDA tag: `cu118`, `cu121`, or `cu122` (match your driver/runtime).
+- Install the GPU extra with the proper indexes so PyTorch and Paddle use CUDA wheels:
+```
+uv pip install '.[gpu]' \
+  --extra-index-url https://download.pytorch.org/whl/cu121 \
+  -f https://www.paddlepaddle.org.cn/whl/cu121
+```
+Alternative two-step if you prefer to pin separately
+```
+uv pip install --extra-index-url https://download.pytorch.org/whl/cu121 torch torchvision
+uv pip install -f https://www.paddlepaddle.org.cn/whl/cu121 paddlepaddle-gpu
+uv pip install .
+```
+
+Verify GPU availability
+```
+uv run python -c "import torch; print('torch cuda:', torch.cuda.is_available())"
+uv run python - <<'PY'
+import paddle
+print('paddle cuda:', paddle.device.is_compiled_with_cuda())
+print('device:', paddle.device.get_device())
+PY
+```
+
+Notes
+- `uv lock --extra gpu` records the dependency set, but wheel indexes come from the install command; keep the PyTorch `--extra-index-url` and Paddle `-f` in your deployment docs/scripts.
+- Replace `cu121` in the URLs with your CUDA version as needed.
+- Thanks to [PR #332](https://github.com/microsoft/OmniParser/pull/332) for clarifying which dependencies to pin in the GPU install instructions.
+
 ## Model Weights License
 For the model checkpoints on huggingface model hub, please note that icon_detect model is under AGPL license since it is a license inherited from the original yolo model. And icon_caption_blip2 & icon_caption_florence is under MIT license. Please refer to the LICENSE file in the folder of each model: https://huggingface.co/microsoft/OmniParser.
 

@@ -50,58 +50,27 @@ def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2
         device = "cuda" if torch.cuda.is_available() else "cpu"
     if model_name == "blip2":
         from transformers import Blip2Processor, Blip2ForConditionalGeneration
-        print(f"[OmniParser] Loading caption model 'BLIP2' from local path '{model_name_or_path}' on device '{device}'.")
-        if not os.path.isdir(model_name_or_path):
-            raise FileNotFoundError(f"BLIP2 path not found: {model_name_or_path}. Ensure the directory contains both model and processor files.")
-        # Basic local file checks
-        required_any = [
-            os.path.exists(os.path.join(model_name_or_path, "pytorch_model.bin")),
-            os.path.exists(os.path.join(model_name_or_path, "model.safetensors")),
-        ]
-        if not any(required_any) or not os.path.exists(os.path.join(model_name_or_path, "config.json")):
-            raise FileNotFoundError(
-                f"BLIP2 local folder missing required model files. Expected model weights and config.json in: {model_name_or_path}"
-            )
-        # Strictly use local files
-        processor = Blip2Processor.from_pretrained(model_name_or_path, local_files_only=True)
+        print(f"[OmniParser] Loading caption model 'BLIP2' from '{model_name_or_path}' on device '{device}'.")
+        print("[OmniParser] If not cached, Hugging Face will download required weights (first run may take a while)...")
+        processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
         if device == 'cpu':
             model = Blip2ForConditionalGeneration.from_pretrained(
-                model_name_or_path, device_map=None, torch_dtype=torch.float32, local_files_only=True
-            ) 
+            model_name_or_path, device_map=None, torch_dtype=torch.float32
+        ) 
         else:
             model = Blip2ForConditionalGeneration.from_pretrained(
-                model_name_or_path, device_map=None, torch_dtype=torch.float16, local_files_only=True
-            ).to(device)
+            model_name_or_path, device_map=None, torch_dtype=torch.float16
+        ).to(device)
         print("[OmniParser] BLIP2 caption model loaded.")
     elif model_name == "florence2":
         from transformers import AutoProcessor, AutoModelForCausalLM 
-        print(f"[OmniParser] Loading caption model 'Florence2' from local path '{model_name_or_path}' on device '{device}'.")
-        if not os.path.isdir(model_name_or_path):
-            raise FileNotFoundError(f"Florence2 path not found: {model_name_or_path}. Ensure the directory contains model, processor, and necessary custom code if required.")
-        # Basic local file checks
-        required_any = [
-            os.path.exists(os.path.join(model_name_or_path, "pytorch_model.bin")),
-            os.path.exists(os.path.join(model_name_or_path, "model.safetensors")),
-        ]
-        has_config = os.path.exists(os.path.join(model_name_or_path, "config.json"))
-        has_processor = os.path.exists(os.path.join(model_name_or_path, "preprocessor_config.json")) or \
-                        os.path.exists(os.path.join(model_name_or_path, "processor_config.json")) or \
-                        os.path.exists(os.path.join(model_name_or_path, "tokenizer_config.json"))
-        if not any(required_any) or not has_config or not has_processor:
-            raise FileNotFoundError(
-                "Florence2 local folder incomplete. Ensure weights (bin/safetensors), config.json, and processor/tokenizer files"
-                f" are present in: {model_name_or_path}. If the model uses custom code, include the local Python module files as well."
-            )
-        # Use only local files for both processor and model
-        processor = AutoProcessor.from_pretrained(model_name_or_path, trust_remote_code=True, local_files_only=True)
+        print(f"[OmniParser] Loading caption model 'Florence2' from '{model_name_or_path}' on device '{device}'.")
+        print("[OmniParser] If not cached, Hugging Face will download required weights (first run may take a while)...")
+        processor = AutoProcessor.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
         if device == 'cpu':
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name_or_path, torch_dtype=torch.float32, trust_remote_code=True, local_files_only=True
-            )
+            model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.float32, trust_remote_code=True)
         else:
-            model = AutoModelForCausalLM.from_pretrained(
-                model_name_or_path, torch_dtype=torch.float16, trust_remote_code=True, local_files_only=True
-            ).to(device)
+            model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.float16, trust_remote_code=True).to(device)
         print("[OmniParser] Florence2 caption model loaded.")
     return {'model': model.to(device), 'processor': processor}
 
@@ -109,7 +78,8 @@ def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2
 def get_yolo_model(model_path):
     from ultralytics import YOLO
     # Load the model.
-    print(f"[OmniParser] Loading YOLO detection model from local path '{model_path}'.")
+    print(f"[OmniParser] Loading YOLO detection model from '{model_path}'.")
+    print("[OmniParser] If not present locally, Ultralytics may download assets (first run may take a while)...")
     model = YOLO(model_path)
     print("[OmniParser] YOLO model ready.")
     return model
@@ -152,7 +122,7 @@ def get_parsed_content_icon(filtered_boxes, starting_idx, image_source, caption_
         else:
             inputs = processor(images=batch, text=[prompt]*len(batch), return_tensors="pt").to(device=device)
         if 'florence' in model.config.name_or_path:
-            generated_ids = model.generate(input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=20, num_beams=1, do_sample=False)
+            generated_ids = model.generate(input_ids=inputs["input_ids"],pixel_values=inputs["pixel_values"],max_new_tokens=20,num_beams=1, do_sample=False)
         else:
             generated_ids = model.generate(**inputs, max_length=100, num_beams=5, no_repeat_ngram_size=2, early_stopping=True, num_return_sequences=1) # temperature=0.01, do_sample=True,
         generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)

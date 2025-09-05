@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OmniParser FastAPI Client</title>
+    <style>
+      :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+      body { margin: 24px; }
+      h1 { margin-bottom: 8px; }
+      fieldset { margin: 12px 0; padding: 12px; }
+      .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+      .col { flex: 1 1 360px; min-width: 280px; }
+      #preview, #annotated { max-width: 100%; border: 1px solid #ddd; border-radius: 6px; }
+      #results { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #fafafa; border: 1px solid #eee; padding: 8px; border-radius: 6px; max-height: 400px; overflow: auto; }
+      button { padding: 8px 12px; font-weight: 600; cursor: pointer; }
+      .muted { color: #666; font-size: 0.9em; }
+      .status { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      label { font-weight: 600; }
+      textarea { width: 100%; min-height: 96px; }
+    </style>
+  </head>
+  <body>
+    <h1>OmniParser Client</h1>
+    <p class="muted">Targets the FastAPI server from <code>fastapi_server.py</code> (default <code>http://localhost:8510</code>).</p>
+
+    <fieldset>
+      <legend>Server</legend>
+      <div class="row">
+        <div class="col">
+          <label for="serverUrl">Server URL</label><br />
+          <input id="serverUrl" type="text" value="http://localhost:8510" style="width:100%" />
+        </div>
+        <div class="col" style="align-self: end; display:flex; gap:8px;">
+          <button id="btnHealth" type="button">Check Health</button>
+          <button id="btnConfig" type="button">Get Config</button>
+        </div>
+      </div>
+      <div id="serverStatus" class="status muted"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Input</legend>
+      <div class="row">
+        <div class="col">
+          <label for="fileInput">Image File</label><br />
+          <input id="fileInput" type="file" accept="image/*" />
+          <div class="muted">If no file is chosen, JSON mode uses the base64/data URL below.</div>
+          <div style="margin-top:8px">
+            <img id="preview" alt="Preview" />
+          </div>
+        </div>
+        <div class="col">
+          <label for="base64Input">Or paste base64/data URL</label>
+          <textarea id="base64Input" placeholder="data:image/png;base64,iVBORw0..."></textarea>
+          <div style="margin-top:8px; display:flex; gap:8px;">
+            <button id="btnParse" type="button">Parse</button>
+            <label><input type="checkbox" id="useJson" /> Force JSON mode</label>
+          </div>
+          <div id="actionStatus" class="status muted" style="margin-top:6px;"></div>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Output</legend>
+      <div class="row">
+        <div class="col">
+          <div><strong>Annotated Image</strong></div>
+          <img id="annotated" alt="Annotated" />
+        </div>
+        <div class="col">
+          <div><strong>Annotation List</strong></div>
+          <div id="results"></div>
+        </div>
+      </div>
+    </fieldset>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      const serverUrl = $('serverUrl');
+      const serverStatus = $('serverStatus');
+      const fileInput = $('fileInput');
+      const base64Input = $('base64Input');
+      const useJson = $('useJson');
+      const btnParse = $('btnParse');
+      const btnHealth = $('btnHealth');
+      const btnConfig = $('btnConfig');
+      const preview = $('preview');
+      const annotated = $('annotated');
+      const results = $('results');
+      const actionStatus = $('actionStatus');
+
+      function setStatus(el, msg, isError=false) {
+        el.textContent = msg || '';
+        el.style.color = isError ? '#b00020' : '#666';
+      }
+
+      async function fetchJSON(url, opts) {
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let data;
+        try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error(`Invalid JSON from ${url}: ${text}`); }
+        if (!res.ok) {
+          const detail = (data && (data.detail || data.message)) || res.statusText;
+          const msg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      // Preview selected image
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files && fileInput.files[0];
+        if (f) {
+          const url = URL.createObjectURL(f);
+          preview.src = url;
+        } else {
+          preview.removeAttribute('src');
+        }
+      });
+
+      btnHealth.addEventListener('click', async () => {
+        setStatus(serverStatus, 'Checking /health ...');
+        try {
+          const data = await fetchJSON(`${serverUrl.value}/health`);
+          setStatus(serverStatus, `OK: ${JSON.stringify(data)}`);
+        } catch (e) {
+          setStatus(serverStatus, `Health error: ${e.message}`, true);
+        }
+      });
+
+      btnConfig.addEventListener('click', async () => {
+        setStatus(serverStatus, 'Fetching /config ...');
+        try {
+          const data = await fetchJSON(`${serverUrl.value}/config`);
+          setStatus(serverStatus, `Config: ${JSON.stringify(data)}`);
+        } catch (e) {
+          setStatus(serverStatus, `Config error: ${e.message}`, true);
+        }
+      });
+
+      btnParse.addEventListener('click', async () => {
+        setStatus(actionStatus, 'Parsing...');
+        results.textContent = '';
+        annotated.removeAttribute('src');
+
+        try {
+          let data;
+          const forceJson = useJson.checked;
+          const hasFile = fileInput.files && fileInput.files[0];
+          const hasBase64 = base64Input.value.trim().length > 0;
+
+          if (!forceJson && hasFile) {
+            // Multipart form with file
+            const form = new FormData();
+            form.append('image', fileInput.files[0]);
+            const res = await fetch(`${serverUrl.value}/parse`, { method: 'POST', body: form });
+            const text = await res.text();
+            try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error(`Invalid JSON: ${text}`); }
+            if (!res.ok) throw new Error((data && (data.detail || data.message)) || res.statusText);
+          } else if (hasBase64) {
+            // JSON body with base64/data URL
+            data = await fetchJSON(`${serverUrl.value}/parse`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image_base64: base64Input.value.trim() })
+            });
+          } else {
+            throw new Error('Provide an image file or a base64/data URL.');
+          }
+
+          // Display results
+          if (data && data.annotated_image_base64) {
+            // Server returns raw base64; construct data URL
+            annotated.src = `data:image/png;base64,${data.annotated_image_base64}`;
+          }
+          results.textContent = JSON.stringify(data.annotation_list || data, null, 2);
+          setStatus(actionStatus, 'Done');
+        } catch (e) {
+          setStatus(actionStatus, `Error: ${e.message}`, true);
+        }
+      });
+    </script>
+  </body>
+  </html>
+
