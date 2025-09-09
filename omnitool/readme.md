@@ -103,7 +103,7 @@ There are three components:
 If your internet speed is slow and you want a minimal VM with less preinstalled apps comment out lines 57 to 350 in this [file](https://github.com/microsoft/OmniParser/blob/master/omnitool/omnibox/vm/win11setup/setupscripts/setup.ps1) that defines all the apps to install when you first create the container + VM. Ensure that you follow factory reset instructions from the next section when creating your VM to wipe any previous omnibox setup.
 
 ### Validation errors: Windows Host is not responding
-If you get this error in Gradio after clicking the submit button, this indicates that the server running in the VM that accepts commands from Gradio and then moves the mouse/ keyboard isn't available. You can verify this by running `curl http://localhost:5000/probe`. Ensure your `omnibox` is fully finished setting up (should no longer have a terminal window). Refer to the omnibox section for timing on that. If you have set up your omnibox, it may be a matter of waiting a little.
+If you get this error in Gradio after clicking the submit button, this indicates that the server running in the VM that accepts commands from Gradio and then moves the mouse/ keyboard isn't available. You can verify this by running `docker exec -it omni-windows bash -c "curl http://localhost:5000/probe"`. Ensure your `omnibox` is fully finished setting up (should no longer have a terminal window). Refer to the omnibox section for timing on that. If you have set up your omnibox, it may be a matter of waiting a little.
 
 If waiting 10 mins doesn't help. Try stopping (`./manage_vm.sh stop`) and starting (`./manage_vm.sh start`) your omnibox VM with the script commands.
 

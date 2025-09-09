@@ -69,7 +69,6 @@ def capture_screen_with_cursor():
     # make the cursor smaller
     cursor = cursor.resize((int(cursor.width / 1.5), int(cursor.height / 1.5)))
     screenshot.paste(cursor, (cursor_x, cursor_y), cursor)
-    
 
     # Convert PIL Image to bytes and send
     img_io = BytesIO()
@@ -78,4 +77,4 @@ def capture_screen_with_cursor():
     return send_file(img_io, mimetype='image/png')
 
 if __name__ == '__main__':
-    app.run(host="127.0.0.1", port=args.port)
+    app.run(host="10.0.2.15", port=args.port)
