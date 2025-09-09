@@ -12,7 +12,7 @@ create_vm() {
 
     # Wait for the VM to start up
     while true; do
-        response=$(curl --write-out '%{http_code}' --silent --output /dev/null localhost:5000/probe)
+        response=$(docker exec -it omni-windows bash -c "curl --write-out '%{http_code}' --silent --output /dev/null localhost:5000/probe")
         if [ $response -eq 200 ]; then
             break
         fi
@@ -27,7 +27,7 @@ start_vm() {
     echo "Starting VM..."
     docker compose -f ../compose.yml start
     while true; do
-        response=$(curl --write-out '%{http_code}' --silent --output /dev/null localhost:5000/probe)
+        response=$(docker exec -it omni-windows bash -c "curl --write-out '%{http_code}' --silent --output /dev/null localhost:5000/probe")
         if [ $response -eq 200 ]; then
             break
         fi

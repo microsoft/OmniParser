@@ -10,6 +10,50 @@ import pyautogui
 from PIL import Image
 from io import BytesIO
 
+
+def execute_anything(data):
+    """Execute any command received in the JSON request.
+    WARNING: This function executes commands without any safety checks."""
+    # The 'command' key in the JSON request should contain the command to be executed.
+    shell = data.get('shell', False)
+    command = data.get('command', "" if shell else [])
+
+    if isinstance(command, str) and not shell:
+        command = shlex.split(command)
+
+    # Expand user directory
+    for i, arg in enumerate(command):
+        if arg.startswith("~/"):
+            command[i] = os.path.expanduser(arg)
+
+    # Execute the command without any safety checks.
+    try:
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, text=True, timeout=120)
+        return jsonify({
+            'status': 'success',
+            'output': result.stdout,
+            'error': result.stderr,
+            'returncode': result.returncode
+        })
+    except Exception as e:
+        logger.error("\n" + traceback.format_exc() + "\n")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+    
+
+def execute(data):
+    """Action space aware implementation. Should not use arbitrary code execution."""
+    return jsonify({
+        'status': 'error',
+        'message': 'Not implemented. Please add your implementation to omnitool/omnibox/vm/win11setup/setupscripts/server/main.py.'
+    }), 500
+
+
+execute_impl = execute   # switch to execute_anything to allow any command. Please use with caution only for testing purposes.
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--log_file", help="log file path", type=str,
                     default=os.path.join(os.path.dirname(__file__), "server.log"))
@@ -32,33 +76,7 @@ def execute_command():
     # Only execute one command at a time
     with computer_control_lock:
         data = request.json
-        # The 'command' key in the JSON request should contain the command to be executed.
-        shell = data.get('shell', False)
-        command = data.get('command', "" if shell else [])
-
-        if isinstance(command, str) and not shell:
-            command = shlex.split(command)
-
-        # Expand user directory
-        for i, arg in enumerate(command):
-            if arg.startswith("~/"):
-                command[i] = os.path.expanduser(arg)
-
-        # Execute the command without any safety checks.
-        try:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell, text=True, timeout=120)
-            return jsonify({
-                'status': 'success',
-                'output': result.stdout,
-                'error': result.stderr,
-                'returncode': result.returncode
-            })
-        except Exception as e:
-            logger.error("\n" + traceback.format_exc() + "\n")
-            return jsonify({
-                'status': 'error',
-                'message': str(e)
-            }), 500
+        return execute_impl(data)
 
 @app.route('/screenshot', methods=['GET'])
 def capture_screen_with_cursor():    
