@@ -12,6 +12,8 @@ from util.utils import check_ocr_box, get_yolo_model, get_caption_model_processo
 import torch
 from PIL import Image
 
+os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+
 yolo_model = get_yolo_model(model_path='weights/icon_detect/model.pt')
 caption_model_processor = get_caption_model_processor(model_name="florence2", model_name_or_path="weights/icon_caption_florence")
 # caption_model_processor = get_caption_model_processor(model_name="blip2", model_name_or_path="weights/icon_caption_blip2")
@@ -27,7 +29,17 @@ MARKDOWN = """
 OmniParser is a screen parsing tool to convert general GUI screen to structured elements. 
 """
 
-DEVICE = torch.device('cuda')
+# DEVICE = torch.device('cuda')
+# Check if MPS is available (for Mac with Apple Silicon)
+if hasattr(torch, 'backends') and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    DEVICE = torch.device('mps')
+# Fall back to CUDA if MPS is not available
+elif torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+# Fall back to CPU as last resort
+else:
+    DEVICE = torch.device('cpu')
+    print("Warning: Neither MPS nor CUDA is available. Using CPU instead.")
 
 # @spaces.GPU
 # @torch.inference_mode()
