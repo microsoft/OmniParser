@@ -21,14 +21,15 @@ import easyocr
 from paddleocr import PaddleOCR
 reader = easyocr.Reader(['en'])
 paddle_ocr = PaddleOCR(
-    lang='en',  # other lang also available
+    # lang='en',  # other lang also available
     use_angle_cls=False,
-    use_gpu=False,  # using cuda will conflict with pytorch in the same process
-    show_log=False,
-    max_batch_size=1024,
-    use_dilation=True,  # improves accuracy
-    det_db_score_mode='slow',  # improves accuracy
-    rec_batch_num=1024)
+    # use_gpu=False,  # using cuda will conflict with pytorch in the same process
+    # show_log=False,
+    # max_batch_size=1024,
+    # use_dilation=True,  # improves accuracy
+    # det_db_score_mode='slow',  # improves accuracy
+    # rec_batch_num=1024)
+)
 import time
 import base64
 
@@ -514,7 +515,7 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
             text_threshold = 0.5
         else:
             text_threshold = easyocr_args['text_threshold']
-        result = paddle_ocr.ocr(image_np, cls=False)[0]
+        result = paddle_ocr.ocr(image_np)[0]
         coord = [item[0] for item in result if item[1][1] > text_threshold]
         text = [item[1][0] for item in result if item[1][1] > text_threshold]
     else:  # EasyOCR
