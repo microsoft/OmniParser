@@ -1,0 +1,4 @@
+fastapi[standard]
+requests
+tqdm
+flask
