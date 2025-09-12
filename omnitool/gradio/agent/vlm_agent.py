@@ -41,6 +41,8 @@ class VLMAgent:
     ):
         if model == "omniparser + gpt-4o":
             self.model = "gpt-4o-2024-11-20"
+        elif model == "omniparser + gpt-4.5-preview":
+            self.model = "gpt-4.5-preview"
         elif model == "omniparser + R1":
             self.model = "deepseek-r1-distill-llama-70b"
         elif model == "omniparser + qwen2.5vl":
