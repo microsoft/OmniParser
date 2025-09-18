@@ -29,5 +29,5 @@ google-auth<3,>=2
 screeninfo
 uiautomation
 dashscope
-
 groq
+pydantic==2.10.6
