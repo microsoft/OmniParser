@@ -61,6 +61,71 @@ To run gradio demo, simply run:
 python gradio_demo.py
 ```
 
+## 🚀 Features
+
+### FastAPI Integration
+A REST API using **FastAPI** is developed to process images uploaded by users, analyze them using **OmniParser**, and return both:
+- The **structured results** (JSON list of detections), and  
+- A **labeled image** with bounding boxes.
+
+This enables remote interaction with OmniParser as a standalone service.
+
+---
+
+## ⚙️ Start the Server
+
+Launch the FastAPI server by running `app.py`.
+Once running, the API will listen on port 5000 by default.
+
+Send a POST request to:
+```
+http://<your-server-address>:5000/process
+```
+The API returns a structured list of detections, each represented as:
+```
+["ID", "Type", "Text", "x1", "y1", "x2", "y2"]
+```
+🧪 Example: Send an Image via Python
+```python
+import requests
+import base64
+from PIL import Image
+from io import BytesIO
+from os.path import basename
+
+# API endpoint
+url = "http://<your-server-address>:5000/process"
+
+# Path to the image you want to send
+image_path = "path/to/your/image.png"
+image_name = basename(image_path)
+
+# Send the image as a POST request
+with open(image_path, 'rb') as image_file:
+    response = requests.post(
+        url,
+        files={'image': image_file},
+        data={'img_name': image_name}
+    )
+
+# Check the response
+if response.status_code == 200:
+    data = response.json()
+
+    # Get the base64 image from the response
+    base64_image = data['base64_image']
+
+    # Decode and open the labeled image
+    image_data = base64.b64decode(base64_image)
+    image = Image.open(BytesIO(image_data))
+    image.show()
+
+    print("Structured results:", data["structured_results"])
+else:
+    print(f"Failed to get a response. Status code: {response.status_code}")
+
+```
+
 ## Model Weights License
 For the model checkpoints on huggingface model hub, please note that icon_detect model is under AGPL license since it is a license inherited from the original yolo model. And icon_caption_blip2 & icon_caption_florence is under MIT license. Please refer to the LICENSE file in the folder of each model: https://huggingface.co/microsoft/OmniParser.
 
