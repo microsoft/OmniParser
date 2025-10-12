@@ -396,6 +396,22 @@ def predict_yolo(model, image, box_threshold, imgsz, scale_img, iou_threshold=0.
     conf = result[0].boxes.conf
     phrases = [str(i) for i in range(len(boxes))]
 
+    # Convert image to numpy array if it's not already
+    if isinstance(image, str):
+        image = cv2.imread(image)
+    elif isinstance(image, Image.Image):
+        image = np.array(image)
+
+    # Draw bounding boxes on the image
+    for box in boxes:
+        x1, y1, x2, y2 = map(int, box)
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Green box with thickness 2
+
+    # Display the image with bounding boxes
+    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    plt.show()
+
     return boxes, conf, phrases
 
 def int_box_area(box, w, h):
@@ -538,3 +554,45 @@ def check_ocr_box(image_source: Union[str, Image.Image], display_img = True, out
         elif output_bb_format == 'xyxy':
             bb = [get_xyxy(item) for item in coord]
     return (text, bb), goal_filtering
+
+def prepare_structured_results(parsed_content_list, label_coordinates, image_input):
+    """     
+    The output will be a list of lists of strings (List[List[str]]). Each list of strings (List[str]) represents one detection 
+    in the format: ["ID", "Type", "Text", "Interactivity", "x1", "y1", "w", "h"].
+    - "ID" is the identifier of the detected box.
+    - "Type" is the type of the detected box, either "Text" or "icon".
+    - "Text" is the label or content associated with the detected box.
+    - "x1", "y1" are the coordinates of the top-left corner of the detected box.
+    - "w", "h" are the width and height of the detected box.
+    """
+    structured_results = []
+    img_width, img_height = image_input.size
+
+    for idx, entry in enumerate(parsed_content_list):
+        box_type = "text" if entry['type'] == 'text' else "icon"
+        label = entry['content']
+        box_id = str(idx)
+        if label=="Close (Ctrl+F4)" or "Microsoft Excel" in label:
+            label = "Close"
+
+        if  box_id in label_coordinates:# and entry['interactivity']:
+            coords = label_coordinates[box_id]
+            x1 = int(coords[0] * img_width)
+            y1 = int(coords[1] * img_height)
+            w = int(coords[2] * img_width)
+            h = int(coords[3] * img_height)
+            interactive = entry['interactivity']
+            structured_results.append([box_id, box_type, label, interactive, str(x1), str(y1), str(w), str(h)])
+    
+    return structured_results
+
+def convert_ocr_results_to_json(image_name, text, ocr_bbox, file_path="ocr_results.json"):
+    """
+    Convert OCR results to JSON format and save to a file.
+    """
+    ocr_json = {
+        image_name: [
+            [t, str(b[0]), str(b[1]), str(b[2]), str(b[3])] for t, b in zip(text, ocr_bbox)
+        ]
+    }
+    return ocr_json
