@@ -1,51 +1,53 @@
-'''
-python -m omniparserserver --som_model_path ../../weights/icon_detect/model.pt --caption_model_name florence2 --caption_model_path ../../weights/icon_caption_florence --device cuda --BOX_TRESHOLD 0.05
-'''
-
 import sys
 import os
 import time
-from fastapi import FastAPI
-from pydantic import BaseModel
-import argparse
-import uvicorn
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(root_dir)
+
+from fastapi import APIRouter, UploadFile, File
+from pydantic import BaseModel, Field
+from typing import Optional
+
 from util.omniparser import Omniparser
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Omniparser API')
-    parser.add_argument('--som_model_path', type=str, default='../../weights/icon_detect/model.pt', help='Path to the som model')
-    parser.add_argument('--caption_model_name', type=str, default='florence2', help='Name of the caption model')
-    parser.add_argument('--caption_model_path', type=str, default='../../weights/icon_caption_florence', help='Path to the caption model')
-    parser.add_argument('--device', type=str, default='cpu', help='Device to run the model')
-    parser.add_argument('--BOX_TRESHOLD', type=float, default=0.05, help='Threshold for box detection')
-    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host for the API')
-    parser.add_argument('--port', type=int, default=8000, help='Port for the API')
-    args = parser.parse_args()
-    return args
 
-args = parse_arguments()
-config = vars(args)
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(root_dir)
 
-app = FastAPI()
-omniparser = Omniparser(config)
 
-class ParseRequest(BaseModel):
-    base64_image: str
+router = APIRouter()
 
-@app.post("/parse/")
-async def parse(parse_request: ParseRequest):
-    print('start parsing...')
+
+class Config(BaseModel):
+    some_model_path: Optional[str] = Field(default="weights/icon_detect/model.pt")
+    caption_model_name: Optional[str] = Field(default="florence2")
+    caption_model_path: Optional[str] = Field(default="weights/icon_caption_florence")
+    device: Optional[str] = Field(default="cpu")
+
+
+@router.post("/parse/")
+async def parse(image: UploadFile = File(...), box_threshold: float = 0.05):
+    print("start parsing...")
+    config = Config()
+    omniparser = Omniparser(
+        config={
+            "som_model_path": config.some_model_path,
+            "caption_model_name": config.caption_model_name,
+            "caption_model_path": config.caption_model_path,
+            "device": config.device,
+            "BOX_TRESHOLD": box_threshold,
+        }
+    )
     start = time.time()
-    dino_labled_img, parsed_content_list = omniparser.parse(parse_request.base64_image)
+    image_bytes = await image.read()
+    dino_labled_img, parsed_content_list = omniparser.parse(image_bytes)
     latency = time.time() - start
-    print('time:', latency)
-    return {"som_image_base64": dino_labled_img, "parsed_content_list": parsed_content_list, 'latency': latency}
+    print("time:", latency)
+    return {
+        "image": dino_labled_img,
+        "parsed_content_list": parsed_content_list,
+        "latency": latency,
+    }
 
-@app.get("/probe/")
+
+@router.get("/probe/")
 async def root():
     return {"message": "Omniparser API ready"}
-
-if __name__ == "__main__":
-    uvicorn.run("omniparserserver:app", host=args.host, port=args.port, reload=True)
