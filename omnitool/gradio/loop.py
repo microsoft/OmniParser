@@ -20,6 +20,8 @@ from agent.anthropic_agent import AnthropicActor
 from agent.vlm_agent import VLMAgent
 from agent.vlm_agent_with_orchestrator import VLMOrchestratedAgent
 from executor.anthropic_executor import AnthropicExecutor
+import requests
+from requests.exceptions import RequestException
 
 BETA_FLAG = "computer-use-2024-10-22"
 
@@ -55,7 +57,19 @@ def sampling_loop_sync(
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser_client = OmniParserClient(url=f"http://{omniparser_url}/parse/")
+    
+    # Try https with a trailing slash if http fails
+    url = omniparser_url
+    try:
+        url_test1 = f'http://{url}/parse'
+        requests.get(url_test1, timeout=3)
+        url = url_test1
+    except RequestException:
+        url_test2 = f'https://{url}/parse/'
+        requests.get(url_test2, timeout=3)
+        url = url_test2
+
+    omniparser_client = OmniParserClient(url=url)
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(

@@ -22,9 +22,11 @@ from tools import ToolResult
 import requests
 from requests.exceptions import RequestException
 import base64
+import glob
 
 CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
+IMG_DIR = "./tmp/outputs/"
 
 INTRO_TEXT = '''
 OmniParser lets you turn any vision-langauge model into an AI agent. We currently support **OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet).**
@@ -192,8 +194,20 @@ def valid_params(user_input, state):
     
     for server_name, url in [('Windows Host', 'localhost:5000'), ('OmniParser Server', args.omniparser_server_url)]:
         try:
-            url = f'http://{url}/probe'
-            response = requests.get(url, timeout=3)
+            if server_name == "OmniParser Server":
+                try:
+                    url_test = f'http://{url}/probe'
+                    response = requests.get(url_test, timeout=3)
+                    if response.status_code != 200:
+                        errors.append(f"{server_name} is not responding")
+                except RequestException:
+                    url_test = f'https://{url}/probe/'
+                    response = requests.get(url_test, timeout=3)
+                    if response.status_code != 200:
+                        errors.append(f"{server_name} is not responding")
+            else:
+                url = f'http://{url}/probe'
+                response = requests.get(url, timeout=3)
             if response.status_code != 200:
                 errors.append(f"{server_name} is not responding")
         except RequestException as e:
@@ -201,6 +215,9 @@ def valid_params(user_input, state):
     
     if not state["api_key"].strip():
         errors.append("LLM API Key is not set")
+
+    if state["provider"] == "azure" and not state.get("azure_resource_name", "").strip():
+        errors.append("Azure Resource Name is required when using Azure OpenAI")
 
     if not user_input:
         errors.append("no computer use request provided")
@@ -405,7 +422,14 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
         state["api_key"] = api_key_value
         state[f'{state["provider"]}_api_key'] = api_key_value
 
+    def clear_img_cache():
+        files = glob.glob(IMG_DIR+'screenshot_*.png')
+        for f in files:
+            os.remove(f)
+
     def clear_chat(state):
+        # Clear images in the cache
+        clear_img_cache()
         # Reset message-related state
         state["messages"] = []
         state["responses"] = {}
