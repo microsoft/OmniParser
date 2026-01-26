@@ -1,0 +1,80 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - master
+      - feature/docker-setup
+
+env:
+  REGISTRY: pbregistryprd.azurecr.io
+  REGISTRY_USERNAME: github-ci
+
+jobs:
+    build-and-push:
+        name: Build and Push OmniParser Image
+        runs-on: ubuntu-latest
+        permissions:
+          contents: read
+          packages: write
+
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
+
+          - name: Determine image version
+            id: version
+            run: |
+                if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+                  VERSION="${GITHUB_REF#refs/tags/v}"
+                else
+                  VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
+                fi
+
+                # Ensure VERSION is not empty
+                if [[ -z "$VERSION" ]]; then
+                  VERSION="0.0.0"
+                fi
+
+                COMMIT_SHA=$(git rev-parse --short HEAD)
+
+                echo "version=$VERSION" >> $GITHUB_OUTPUT
+                echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+
+          - name: Set up Docker Buildx
+            uses: docker/setup-buildx-action@v3
+
+          - name: Log in to Azure Container Registry
+            uses: docker/login-action@v3
+            with:
+              registry: ${{ env.REGISTRY }}
+              username: ${{ env.REGISTRY_USERNAME }}
+              password: ${{ secrets.AZURE_REGISTRY_PASSWORD }}
+
+          - name: Generate image metadata
+            id: meta
+            run: |
+              TAG=latest
+              VERSION="${{ steps.version.outputs.version }}"
+
+              echo "tag=${TAG}" >> $GITHUB_OUTPUT
+              echo "full_tag=${VERSION}" >> $GITHUB_OUTPUT
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+          - name: Build and push OmniParser image
+            uses: docker/build-push-action@v5
+            with:
+              context: .
+              file: ./Dockerfile
+              push: true
+              tags: |
+                ${{ env.REGISTRY }}/omniparser:${{ steps.meta.outputs.full_tag }}
+                ${{ env.REGISTRY }}/omniparser:${{ steps.meta.outputs.tag }}
+
+          - name: Output image tags
+            run: |
+              echo "### Built and pushed OmniParser image to Azure Container Registry" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**OmniParser Image:**" >> $GITHUB_STEP_SUMMARY
+              echo "- \`${{ env.REGISTRY }}/omniparser:${{ steps.meta.outputs.full_tag }}\`" >> $GITHUB_STEP_SUMMARY
+              echo "- \`${{ env.REGISTRY }}/omniparser:${{ steps.meta.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
