@@ -42,15 +42,29 @@ RUN mkdir -p weights/icon_detect weights/icon_caption_florence \
     # Flatten icon_caption folder if Hugging Face created a nested folder
     && if [ -d weights/icon_caption_florence/icon_caption ]; then mv weights/icon_caption_florence/icon_caption/* weights/icon_caption_florence/ && rmdir weights/icon_caption_florence/icon_caption; fi
 
+# Create directories that will be mounted as volumes
+# These should be empty in the image - volumes will populate them
+RUN mkdir -p /models/easyocr \
+    && mkdir -p /models/ultralytics
+
 # Copy app source
 COPY . .
 
-# Change working directory to the server folder and run with full arguments
+# Change working directory to the server folder
 WORKDIR /app/omnitool/omniparserserver
+
+# Set environment variables to use volume paths
+ENV EASYOCR_MODULE_PATH=/models/easyocr
+ENV EASYOCR_DOWNLOAD_ENABLED=True
+ENV YOLO_CONFIG_DIR=/models/ultralytics
+ENV ULTRA_VERBOSE=False
 
 CMD ["python", "-m", "omniparserserver", \
      "--som_model_path", "../../weights/icon_detect/model.pt", \
      "--caption_model_name", "florence2", \
      "--caption_model_path", "../../weights/icon_caption_florence", \
      "--device", "cuda", \
-     "--BOX_TRESHOLD", "0.05"]
+     "--BOX_TRESHOLD", "0.05", \
+     "--host", "0.0.0.0", \
+     "--port", "8000"]
+

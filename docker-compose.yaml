@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  omniparser:
+    build: .
+    container_name: omniparser-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent volume for EasyOCR models
+      - easyocr_models:/models/easyocr
+      # Persistent volume for Ultralytics config
+      - ultralytics_config:/models/ultralytics
+      # Persistent volume for PaddleOCR wheels
+      - paddleocr_models:/root/.paddleocr
+      
+    environment:
+      - EASYOCR_MODULE_PATH=/models/easyocr
+      - YOLO_CONFIG_DIR=/models/ultralytics
+      - ULTRA_VERBOSE=False
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  easyocr_models:
+  ultralytics_config:
+  paddleocr_models:
