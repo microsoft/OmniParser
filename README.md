@@ -55,6 +55,25 @@ download 'model_v1_5.pt' from https://huggingface.co/microsoft/OmniParser/tree/m
 ## Examples:
 We put together a few simple examples in the demo.ipynb. 
 
+## Code Structure
+The parsing pipeline is organized into explicit stages under `omniparser_core/`:
+
+- `ocr.py`: OCR extraction (`check_ocr_box`)
+- `detection.py`: icon detection (`predict_yolo`)
+- `postprocess.py`: merge/filter and overlap handling (`remove_overlap_new`)
+- `captioning.py`: icon caption generation (`get_parsed_content_icon`)
+- `rendering.py`: box rendering and coordinate conversion (`annotate`)
+- `models.py`: model loading (`get_yolo_model`, `get_caption_model`)
+- `pipeline.py`: explicit stage orchestration
+- `omniparser.py`: high-level parser class used by the API server
+
+Pipeline orchestration lives in `omniparser_core/pipeline.py` with clear steps:
+`run_ocr -> run_icon_detection -> build_elements -> run_icon_caption -> render_labeled_image`.
+
+Server entrypoints:
+- `omniparser_core/omniparser.py`: OmniParser class using the pipeline
+- `omnitool/omniparserserver/`: FastAPI app/config/schemas/service modules
+
 ## Gradio Demo
 To run gradio demo, simply run:
 ```python
