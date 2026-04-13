@@ -18,7 +18,7 @@ paddlepaddle
 paddleocr
 ruff==0.6.7
 pre-commit==3.8.0
-pytest==8.3.3
+pytest==9.0.3
 pytest-asyncio==0.23.6
 pyautogui==0.9.54
 streamlit>=1.38.0
