@@ -47,6 +47,8 @@ def run_groq_interleaved(messages: list, system: str, model_name: str, api_key: 
             reasoning_format="raw"
         )
         
+        if not completion.choices or completion.choices[0].message is None:
+            raise ValueError("LLM returned empty or filtered response")
         response = completion.choices[0].message.content
         final_answer = response.split('</think>\n')[-1] if '</think>' in response else response
         final_answer = final_answer.replace("<output>", "").replace("</output>", "")
