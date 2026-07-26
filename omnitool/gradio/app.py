@@ -1,5 +1,6 @@
 """
-python app.py --windows_host_url localhost:8006 --omniparser_server_url localhost:8000
+python app.py --host_device omnibox_windows --windows_host_url localhost:8006 --omniparser_server_url localhost:8000
+python app.py --host_device local --omniparser_server_url localhost:8000
 """
 
 import os
@@ -27,7 +28,7 @@ CONFIG_DIR = Path("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 
 INTRO_TEXT = '''
-OmniParser lets you turn any vision-langauge model into an AI agent. We currently support **OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL) or Anthropic Computer Use (Sonnet).**
+OmniParser lets you turn any vision-langauge model into an AI agent. We currently support **OpenAI (4o/o1/o3-mini), DeepSeek (R1), Qwen (2.5VL), Gemini (2.0/2.5) or Anthropic Computer Use (Sonnet).**
 
 Type a message and press submit to start OmniTool. Press stop to pause, and press the trash icon in the chat to clear the message history.
 '''
@@ -35,7 +36,8 @@ Type a message and press submit to start OmniTool. Press stop to pause, and pres
 def parse_arguments():
 
     parser = argparse.ArgumentParser(description="Gradio App")
-    parser.add_argument("--windows_host_url", type=str, default='localhost:8006')
+    parser.add_argument("--host_device", type=str, choices=["omnibox_windows", "local"], default="omnibox_windows")
+    parser.add_argument("--windows_host_url", type=str, default="localhost:8006")
     parser.add_argument("--omniparser_server_url", type=str, default="localhost:8000")
     return parser.parse_args()
 args = parse_arguments()
@@ -189,8 +191,13 @@ def chatbot_output_callback(message, chatbot_state, hide_images=False, sender="b
 def valid_params(user_input, state):
     """Validate all requirements and return a list of error messages."""
     errors = []
+
+    servers = [('OmniParser Server', args.omniparser_server_url)]
+
+    if args.host_device == "omnibox_windows":
+        servers.append(("Windows Host", args.windows_host_url))
     
-    for server_name, url in [('Windows Host', 'localhost:5000'), ('OmniParser Server', args.omniparser_server_url)]:
+    for server_name, url in servers:
         try:
             url = f'http://{url}/probe'
             response = requests.get(url, timeout=3)
@@ -233,6 +240,7 @@ def process_input(user_input, state):
 
     # Run sampling_loop_sync with the chatbot_output_callback
     for loop_msg in sampling_loop_sync(
+        args=args,
         model=state["model"],
         provider=state["provider"],
         messages=state["messages"],
@@ -241,8 +249,7 @@ def process_input(user_input, state):
         api_response_callback=partial(_api_response_callback, response_state=state["responses"]),
         api_key=state["api_key"],
         only_n_most_recent_images=state["only_n_most_recent_images"],
-        max_tokens=16384,
-        omniparser_url=args.omniparser_server_url
+        max_tokens=16384
     ):  
         if loop_msg is None or state.get("stop"):
             yield state['chatbot_messages']
@@ -302,7 +309,7 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             with gr.Column():
                 model = gr.Dropdown(
                     label="Model",
-                    choices=["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"],
+                    choices=["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "claude-3-5-sonnet-20241022", "omniparser + gemini-2.0-flash", "omniparser + gemini-2.5-flash-preview-04-17", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated", "omniparser + gemini-2.0-flash-orchestrated", "omniparser + gemini-2.5-flash-preview-04-17-orchestrated"],
                     value="omniparser + gpt-4o",
                     interactive=True,
                 )
@@ -343,12 +350,13 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
     with gr.Row():
         with gr.Column(scale=2):
             chatbot = gr.Chatbot(label="Chatbot History", autoscroll=True, height=580)
-        with gr.Column(scale=3):
-            iframe = gr.HTML(
-                f'<iframe src="http://{args.windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
-                container=False,
-                elem_classes="no-padding"
-            )
+        if args.host_device == "omnibox_windows":
+            with gr.Column(scale=3):
+                iframe = gr.HTML(
+                    f'<iframe src="http://{args.windows_host_url}/vnc.html?view_only=1&autoconnect=1&resize=scale" width="100%" height="580" allow="fullscreen"></iframe>',
+                    container=False,
+                    elem_classes="no-padding"
+                )
 
     def update_model(model_selection, state):
         state["model"] = model_selection
@@ -362,6 +370,8 @@ with gr.Blocks(theme=gr.themes.Default()) as demo:
             provider_choices = ["groq"]
         elif model_selection == "omniparser + qwen2.5vl":
             provider_choices = ["dashscope"]
+        elif model_selection in set(["omniparser + gemini-2.0-flash", "omniparser + gemini-2.5-flash-preview-04-17", "omniparser + gemini-2.0-flash-orchestrated", "omniparser + gemini-2.5-flash-preview-04-17-orchestrated"]):
+            provider_choices = ["gemini"]
         else:
             provider_choices = [option.value for option in APIProvider]
         default_provider_value = provider_choices[0]

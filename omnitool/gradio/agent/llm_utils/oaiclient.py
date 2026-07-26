@@ -1,6 +1,3 @@
-import os
-import logging
-import base64
 import requests
 from .utils import is_image_path, encode_image
 

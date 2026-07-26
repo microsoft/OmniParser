@@ -14,6 +14,7 @@ from anthropic.types.beta import BetaMessage, BetaTextBlock, BetaToolUseBlock, B
 
 from agent.llm_utils.oaiclient import run_oai_interleaved
 from agent.llm_utils.groqclient import run_groq_interleaved
+from agent.llm_utils.geminiclient import run_gemini_interleaved
 from agent.llm_utils.utils import is_image_path
 import time
 import re
@@ -85,6 +86,10 @@ class VLMOrchestratedAgent:
             self.model = "o1"
         elif model == "omniparser + o3-mini" or model == "omniparser + o3-mini-orchestrated":
             self.model = "o3-mini"
+        elif model == "omniparser + gemini-2.0-flash" or model == "omniparser + gemini-2.0-flash-orchestrated":
+            self.model = "gemini-2.0-flash"
+        elif model == "omniparser + gemini-2.5-flash-preview-04-17" or model == "omniparser + gemini-2.5-flash-preview-04-17-orchestrated":
+            self.model = "gemini-2.5-flash-preview-04-17"
         else:
             raise ValueError(f"Model {model} not supported")
         
@@ -194,6 +199,18 @@ class VLMOrchestratedAgent:
             print(f"qwen token usage: {token_usage}")
             self.total_token_usage += token_usage
             self.total_cost += (token_usage * 2.2 / 1000000)  # https://help.aliyun.com/zh/model-studio/getting-started/models?spm=a2c4g.11186623.0.0.74b04823CGnPv7#fe96cfb1a422a
+        elif "gemini" in self.model:
+            vlm_response, token_usage = run_gemini_interleaved(
+                messages=planner_messages,
+                system=system,
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+                temperature=0,
+            )
+            print(f"gemini token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += 0 # assume using free tier
         else:
             raise ValueError(f"Model {self.model} not supported")
         latency_vlm = time.time() - start
@@ -312,6 +329,15 @@ Your available "Next Action" only include:
 
 Based on the visual information from the screenshot image and the detected bounding boxes, please determine the next action, the Box ID you should operate on (if action is one of 'type', 'hover', 'scroll_up', 'scroll_down', 'wait', there should be no Box ID field), and the value (if the action is 'type') in order to complete the task.
 
+Use this JSON schema:
+
+Action = {{
+    "Reasoning": str,
+    "Next Action": str,
+    "Box ID": str | None,
+    "value": str | None
+}}
+
 Output format:
 ```json
 {{
@@ -381,7 +407,9 @@ IMPORTANT NOTES:
         plan_prompt = self._get_plan_prompt(self._task)
         input_message = copy.deepcopy(messages)
         input_message.append({"role": "user", "content": plan_prompt})
-        vlm_response, token_usage = run_oai_interleaved(
+
+        if "gpt" in self.model or "o1" in self.model or "o3-mini" in self.model:
+            vlm_response, token_usage = run_oai_interleaved(
                 messages=input_message,
                 system="",
                 model_name=self.model,
@@ -390,6 +418,53 @@ IMPORTANT NOTES:
                 provider_base_url="https://api.openai.com/v1",
                 temperature=0,
             )
+            print(f"oai token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            if 'gpt' in self.model:
+                self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o1' in self.model:
+                self.total_cost += (token_usage * 15 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o3-mini' in self.model:
+                self.total_cost += (token_usage * 1.1 / 1000000)  # https://openai.com/api/pricing/
+        elif "r1" in self.model:
+            vlm_response, token_usage = run_groq_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+            )
+            print(f"groq token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 0.99 / 1000000)
+        elif "qwen" in self.model:
+            vlm_response, token_usage = run_oai_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=min(2048, self.max_tokens),
+                provider_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                temperature=0,
+            )
+            print(f"qwen token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 2.2 / 1000000)  # https://help.aliyun.com/zh/model-studio/getting-started/models?spm=a2c4g.11186623.0.0.74b04823CGnPv7#fe96cfb1a422a
+        elif "gemini" in self.model:
+            vlm_response, token_usage = run_gemini_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+                temperature=0,
+            )
+            print(f"gemini token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += 0 # assume using free tier
+        else:
+            raise ValueError(f"Model {self.model} not supported")
+        
         plan = extract_data(vlm_response, "json")
         
         # Create a filename with timestamp
@@ -413,7 +488,9 @@ IMPORTANT NOTES:
         update_ledger_prompt = ORCHESTRATOR_LEDGER_PROMPT.format(task=self._task)
         input_message = copy.deepcopy(messages)
         input_message.append({"role": "user", "content": update_ledger_prompt})
-        vlm_response, token_usage = run_oai_interleaved(
+        
+        if "gpt" in self.model or "o1" in self.model or "o3-mini" in self.model:
+            vlm_response, token_usage = run_oai_interleaved(
                 messages=input_message,
                 system="",
                 model_name=self.model,
@@ -422,6 +499,53 @@ IMPORTANT NOTES:
                 provider_base_url="https://api.openai.com/v1",
                 temperature=0,
             )
+            print(f"oai token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            if 'gpt' in self.model:
+                self.total_cost += (token_usage * 2.5 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o1' in self.model:
+                self.total_cost += (token_usage * 15 / 1000000)  # https://openai.com/api/pricing/
+            elif 'o3-mini' in self.model:
+                self.total_cost += (token_usage * 1.1 / 1000000)  # https://openai.com/api/pricing/
+        elif "r1" in self.model:
+            vlm_response, token_usage = run_groq_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+            )
+            print(f"groq token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 0.99 / 1000000)
+        elif "qwen" in self.model:
+            vlm_response, token_usage = run_oai_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=min(2048, self.max_tokens),
+                provider_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                temperature=0,
+            )
+            print(f"qwen token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += (token_usage * 2.2 / 1000000)  # https://help.aliyun.com/zh/model-studio/getting-started/models?spm=a2c4g.11186623.0.0.74b04823CGnPv7#fe96cfb1a422a
+        elif "gemini" in self.model:
+            vlm_response, token_usage = run_gemini_interleaved(
+                messages=input_message,
+                system="",
+                model_name=self.model,
+                api_key=self.api_key,
+                max_tokens=self.max_tokens,
+                temperature=0,
+            )
+            print(f"gemini token usage: {token_usage}")
+            self.total_token_usage += token_usage
+            self.total_cost += 0 # assume using free tier
+        else:
+            raise ValueError(f"Model {self.model} not supported")
+        
         updated_ledger = extract_data(vlm_response, "json")
         return updated_ledger
     

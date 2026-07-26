@@ -28,6 +28,7 @@ class APIProvider(StrEnum):
     BEDROCK = "bedrock"
     VERTEX = "vertex"
     OPENAI = "openai"
+    GEMINI = "gemini"
 
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
@@ -35,10 +36,12 @@ PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
     APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
     APIProvider.OPENAI: "gpt-4o",
+    APIProvider.GEMINI: "gemini-2.0-flash"
 }
 
 def sampling_loop_sync(
     *,
+    args,
     model: str,
     provider: APIProvider | None,
     messages: list[BetaMessageParam],
@@ -48,17 +51,17 @@ def sampling_loop_sync(
     api_key: str,
     only_n_most_recent_images: int | None = 2,
     max_tokens: int = 4096,
-    omniparser_url: str,
     save_folder: str = "./uploads"
 ):
     """
     Synchronous agentic sampling loop for the assistant/tool interaction of computer use.
     """
     print('in sampling_loop_sync, model:', model)
-    omniparser_client = OmniParserClient(url=f"http://{omniparser_url}/parse/")
+    omniparser_client = OmniParserClient(host_device=args.host_device, url=f"http://{args.omniparser_server_url}/parse/")
     if model == "claude-3-5-sonnet-20241022":
         # Register Actor and Executor
         actor = AnthropicActor(
+            args=args,
             model=model, 
             provider=provider,
             api_key=api_key, 
@@ -66,7 +69,7 @@ def sampling_loop_sync(
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
         )
-    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl"]):
+    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "omniparser + gemini-2.0-flash", "omniparser + gemini-2.5-flash-preview-04-17"]):
         actor = VLMAgent(
             model=model,
             provider=provider,
@@ -76,7 +79,7 @@ def sampling_loop_sync(
             max_tokens=max_tokens,
             only_n_most_recent_images=only_n_most_recent_images
         )
-    elif model in set(["omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"]):
+    elif model in set(["omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated", "omniparser + gemini-2.0-flash-orchestrated", "omniparser + gemini-2.5-flash-preview-04-17-orchestrated"]):
         actor = VLMOrchestratedAgent(
             model=model,
             provider=provider,
@@ -90,6 +93,7 @@ def sampling_loop_sync(
     else:
         raise ValueError(f"Model {model} not supported")
     executor = AnthropicExecutor(
+        args=args,
         output_callback=output_callback,
         tool_output_callback=tool_output_callback,
     )
@@ -115,7 +119,7 @@ def sampling_loop_sync(
 
             messages.append({"content": tool_result_content, "role": "user"})
     
-    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated"]):
+    elif model in set(["omniparser + gpt-4o", "omniparser + o1", "omniparser + o3-mini", "omniparser + R1", "omniparser + qwen2.5vl", "omniparser + gemini-2.0-flash", "omniparser + gemini-2.5-flash-preview-04-17", "omniparser + gpt-4o-orchestrated", "omniparser + o1-orchestrated", "omniparser + o3-mini-orchestrated", "omniparser + R1-orchestrated", "omniparser + qwen2.5vl-orchestrated", "omniparser + gemini-2.0-flash-orchestrated", "omniparser + gemini-2.0-flash-thinking-exp-orchestrated"]):
         while True:
             parsed_screen = omniparser_client()
             tools_use_needed, vlm_response_json = actor(messages=messages, parsed_screen=parsed_screen)

@@ -18,11 +18,12 @@ from tools import ComputerTool, ToolCollection, ToolResult
 class AnthropicExecutor:
     def __init__(
         self, 
+        args,
         output_callback: Callable[[BetaContentBlockParam], None], 
         tool_output_callback: Callable[[Any, str], None],
     ):
         self.tool_collection = ToolCollection(
-            ComputerTool()
+            ComputerTool(args=args)
         )
         self.output_callback = output_callback
         self.tool_output_callback = tool_output_callback

@@ -8,11 +8,13 @@ OUTPUT_DIR = "./tmp/outputs"
 
 class OmniParserClient:
     def __init__(self, 
+                 host_device: str,
                  url: str) -> None:
+        self.host_device = host_device
         self.url = url
 
     def __call__(self,):
-        screenshot, screenshot_path = get_screenshot()
+        screenshot, screenshot_path = get_screenshot(host_device=self.host_device)
         screenshot_path = str(screenshot_path)
         image_base64 = encode_image(screenshot_path)
         response = requests.post(self.url, json={"base64_image": image_base64})
