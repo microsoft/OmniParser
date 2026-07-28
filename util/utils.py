@@ -446,14 +446,17 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     for item in filtered_boxes:
         # If the item is just a list of coordinates (the bug), wrap it in a dict
         if isinstance(item, (list, tuple)):
-            safe_boxes.append({'type': 'icon', 'bbox': item, 'content': None})
+            safe_boxes.append({'type': 'icon', 'bbox': list(item), 'interactivity': True, 'content': None, 'source': 'box_yolo_content_yolo'})
         else:
+            # Ensure required keys exist so downstream code can safely index
+            if isinstance(item, dict):
+                item.setdefault('content', None)
             safe_boxes.append(item)
-    
+
     # Now sort the safe list
     filtered_boxes_elem = sorted(safe_boxes, key=lambda x: x.get('content') is None)
     # get the index of the first 'content': None
-    starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
+    starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box.get('content') is None), len(filtered_boxes_elem))
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
     print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
