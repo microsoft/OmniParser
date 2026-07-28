@@ -29,6 +29,7 @@ import base64
 import os
 import ast
 import torch
+from pathlib import Path
 from typing import Tuple, List, Union
 from torchvision.ops import box_convert
 import re
@@ -62,11 +63,20 @@ def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2
     return {'model': model.to(device), 'processor': processor}
 
 
-def get_yolo_model(model_path):
+def get_yolo_model(model_path=None, device=None):
+    if model_path is None:
+        local_model_path = Path(__file__).resolve().parents[1] / "weights/icon_detect_v3/model.pt"
+        if local_model_path.is_file():
+            model_path = local_model_path
+
+    if model_path is None or "icon_detect_v3" in Path(model_path).parts:
+        from util.yolov9 import YOLOv9Detector
+
+        return YOLOv9Detector(model_path=model_path, device=device)
+
     from ultralytics import YOLO
-    # Load the model.
-    model = YOLO(model_path)
-    return model
+
+    return YOLO(model_path)
 
 
 @torch.inference_mode()

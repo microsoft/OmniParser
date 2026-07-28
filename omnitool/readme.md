@@ -62,10 +62,11 @@ There are three components:
 
    g. Continue from here if you already had the conda environment.
 
-   h. Ensure you have the V2 weights downloaded in weights folder (**ensure caption weights folder is called icon_caption_florence**). If not download them with:
+   h. Until Hugging Face PR 37 is merged, download the latest detector from the PR. Then download the caption weights:
    ```
-   rm -rf weights/icon_detect weights/icon_caption weights/icon_caption_florence 
-   for folder in icon_caption icon_detect; do huggingface-cli download microsoft/OmniParser-v2.0 --local-dir weights --repo-type model --include "$folder/*"; done
+   huggingface-cli download microsoft/OmniParser-v2.0 icon_detect_v3/model.pt --revision refs/pr/37 --local-dir weights
+   rm -rf weights/icon_caption weights/icon_caption_florence
+   huggingface-cli download microsoft/OmniParser-v2.0 --local-dir weights --repo-type model --include "icon_caption/*"
    mv weights/icon_caption weights/icon_caption_florence
    ```
 

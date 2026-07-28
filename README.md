@@ -13,6 +13,7 @@
 **OmniParser** is a comprehensive method for parsing user interface screenshots into structured and easy-to-understand elements, which significantly enhances the ability of GPT-4V to generate actions that can be accurately grounded in the corresponding regions of the interface. 
 
 ## News
+- [2026/7] We add a YOLOv9-E interactive region detector. Its inference-only weight is available in [Hugging Face PR #37](https://huggingface.co/microsoft/OmniParser-v2.0/discussions/37).
 - [2025/3] We support local logging of trajecotry so that you can use OmniParser+OmniTool to build training data pipeline for your favorate agent in your domain. [Documentation WIP]
 - [2025/3] We are gradually adding multi agents orchstration and improving user interface in OmniTool for better experience.
 - [2025/2] We release OmniParser V2 [checkpoints](https://huggingface.co/microsoft/OmniParser-v2.0). [Watch Video](https://1drv.ms/v/c/650b027c18d5a573/EWXbVESKWo9Buu6OYCwg06wBeoM97C6EOTG6RjvWLEN1Qg?e=alnHGC)
@@ -33,10 +34,15 @@ conda activate omni
 pip install -r requirements.txt
 ```
 
-Ensure you have the V2 weights downloaded in weights folder (ensure caption weights folder is called icon_caption_florence). If not download them with:
+Until [Hugging Face PR #37](https://huggingface.co/microsoft/OmniParser-v2.0/discussions/37) is merged, download the latest YOLOv9-E detector from the PR:
 ```
-   # download the model checkpoints to local directory OmniParser/weights/
-   for f in icon_detect/{train_args.yaml,model.pt,model.yaml} icon_caption/{config.json,generation_config.json,model.safetensors}; do huggingface-cli download microsoft/OmniParser-v2.0 "$f" --local-dir weights; done
+huggingface-cli download microsoft/OmniParser-v2.0 icon_detect_v3/model.pt \
+  --revision refs/pr/37 --local-dir weights
+```
+
+OmniParser prefers this local weight. After the PR is merged, it will download the same weight automatically on first use. Download the caption weights into the `weights` folder:
+```
+   for f in icon_caption/{config.json,generation_config.json,model.safetensors}; do huggingface-cli download microsoft/OmniParser-v2.0 "$f" --local-dir weights; done
    mv weights/icon_caption weights/icon_caption_florence
 ```
 
@@ -62,7 +68,7 @@ python gradio_demo.py
 ```
 
 ## Model Weights License
-For the model checkpoints on huggingface model hub, please note that icon_detect model is under AGPL license since it is a license inherited from the original yolo model. And icon_caption_blip2 & icon_caption_florence is under MIT license. Please refer to the LICENSE file in the folder of each model: https://huggingface.co/microsoft/OmniParser.
+`icon_detect_v3` is based on the MIT-licensed YOLOv9 implementation. Earlier Ultralytics-based icon detectors retain their original AGPL license. The caption models are under the MIT license.
 
 ## 📚 Citation
 Our technical report can be found [here](https://arxiv.org/abs/2408.00203).

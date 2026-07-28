@@ -9,7 +9,7 @@ class Omniparser(object):
         self.config = config
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        self.som_model = get_yolo_model(model_path=config['som_model_path'])
+        self.som_model = get_yolo_model(model_path=config.get('som_model_path'), device=device)
         self.caption_model_processor = get_caption_model_processor(model_name=config['caption_model_name'], model_name_or_path=config['caption_model_path'], device=device)
         print('Omniparser initialized!!!')
 
