@@ -494,12 +494,16 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
         annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, text_scale=text_scale, text_padding=text_padding)
         
     pil_img = Image.fromarray(annotated_frame)
+    
+    buffered = io.BytesIO()
+    pil_img.save(buffered, format="PNG")
+    encoded_image = base64.b64encode(buffered.getvalue()).decode('ascii')
+    
     if output_coord_in_ratio:
         label_coordinates = {k: [v[0]/w, v[1]/h, v[2]/w, v[3]/h] for k, v in label_coordinates.items()}
         assert w == annotated_frame.shape[1] and h == annotated_frame.shape[0]
         
-    return pil_img, label_coordinates, filtered_boxes_elem
-
+    return encoded_image, label_coordinates, filtered_boxes_elem
 def get_xywh(input):
     x, y, w, h = input[0][0], input[0][1], input[2][0] - input[0][0], input[2][1] - input[0][1]
     x, y, w, h = int(x), int(y), int(w), int(h)
