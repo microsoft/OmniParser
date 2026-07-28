@@ -22,13 +22,7 @@ from paddleocr import PaddleOCR
 reader = easyocr.Reader(['en'])
 paddle_ocr = PaddleOCR(
     lang='en',  # other lang also available
-    use_angle_cls=False,
-    use_gpu=False,  # using cuda will conflict with pytorch in the same process
-    show_log=False,
-    max_batch_size=1024,
-    use_dilation=True,  # improves accuracy
-    det_db_score_mode='slow',  # improves accuracy
-    rec_batch_num=1024)
+)
 import time
 import base64
 
@@ -42,7 +36,7 @@ import re
 from torchvision.transforms import ToPILImage
 import supervision as sv
 import torchvision.transforms as T
-from util.box_annotator import BoxAnnotator 
+from .box_annotator import BoxAnnotator 
 
 
 def get_caption_model_processor(model_name, model_name_or_path="Salesforce/blip2-opt-2.7b", device=None):
@@ -440,15 +434,29 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
     else:
         print('no ocr bbox!!!')
         ocr_bbox = None
-
+    if ocr_bbox is None: ocr_bbox = []
+    if ocr_text is None: ocr_text = []
     ocr_bbox_elem = [{'type': 'text', 'bbox':box, 'interactivity':False, 'content':txt, 'source': 'box_ocr_content_ocr'} for box, txt in zip(ocr_bbox, ocr_text) if int_box_area(box, w, h) > 0] 
     xyxy_elem = [{'type': 'icon', 'bbox':box, 'interactivity':True, 'content':None} for box in xyxy.tolist() if int_box_area(box, w, h) > 0]
     filtered_boxes = remove_overlap_new(boxes=xyxy_elem, iou_threshold=iou_threshold, ocr_bbox=ocr_bbox_elem)
     
     # sort the filtered_boxes so that the one with 'content': None is at the end, and get the index of the first 'content': None
-    filtered_boxes_elem = sorted(filtered_boxes, key=lambda x: x['content'] is None)
+    # filtered_boxes_elem = sorted(filtered_boxes, key=lambda x: x['content'] is None)
+    safe_boxes = []
+    for item in filtered_boxes:
+        # If the item is just a list of coordinates (the bug), wrap it in a dict
+        if isinstance(item, (list, tuple)):
+            safe_boxes.append({'type': 'icon', 'bbox': list(item), 'interactivity': True, 'content': None, 'source': 'box_yolo_content_yolo'})
+        else:
+            # Ensure required keys exist so downstream code can safely index
+            if isinstance(item, dict):
+                item.setdefault('content', None)
+            safe_boxes.append(item)
+
+    # Now sort the safe list
+    filtered_boxes_elem = sorted(safe_boxes, key=lambda x: x.get('content') is None)
     # get the index of the first 'content': None
-    starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box['content'] is None), -1)
+    starting_idx = next((i for i, box in enumerate(filtered_boxes_elem) if box.get('content') is None), len(filtered_boxes_elem))
     filtered_boxes = torch.tensor([box['bbox'] for box in filtered_boxes_elem])
     print('len(filtered_boxes):', len(filtered_boxes), starting_idx)
 
@@ -484,18 +492,18 @@ def get_som_labeled_img(image_source: Union[str, Image.Image], model=None, BOX_T
         annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, **draw_bbox_config)
     else:
         annotated_frame, label_coordinates = annotate(image_source=image_source, boxes=filtered_boxes, logits=logits, phrases=phrases, text_scale=text_scale, text_padding=text_padding)
-    
+        
     pil_img = Image.fromarray(annotated_frame)
+    
     buffered = io.BytesIO()
     pil_img.save(buffered, format="PNG")
     encoded_image = base64.b64encode(buffered.getvalue()).decode('ascii')
+    
     if output_coord_in_ratio:
         label_coordinates = {k: [v[0]/w, v[1]/h, v[2]/w, v[3]/h] for k, v in label_coordinates.items()}
         assert w == annotated_frame.shape[1] and h == annotated_frame.shape[0]
-
+        
     return encoded_image, label_coordinates, filtered_boxes_elem
-
-
 def get_xywh(input):
     x, y, w, h = input[0][0], input[0][1], input[2][0] - input[0][0], input[2][1] - input[0][1]
     x, y, w, h = int(x), int(y), int(w), int(h)

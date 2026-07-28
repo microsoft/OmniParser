@@ -3,19 +3,33 @@ easyocr
 torchvision
 supervision==0.18.0
 openai==1.3.5
-transformers
+
+# Fix for Florence2 Crash
+transformers==4.40.0
 huggingface_hub
+
 ultralytics==8.3.70
 azure-identity
 numpy==1.26.4
-opencv-python
+
+# If you need an interactive, desktop-level GUI features, use 'opencv-python' and comment out opencv-python-headless, both of them contain the same core file.
+
+# Includes GUI dependencies (like Qt)
+#opencv-python
+
+# Removes the GUI dependencies. This is smaller and designed for server environments.
 opencv-python-headless
+
 gradio
 dill
 accelerate
 timm
 einops==0.8.0
+
+# To use the model on a GPU, change paddlepaddle to: paddlepaddle-gpu
 paddlepaddle
+# paddleocr won't be able to find the GPU since paddlepaddle is a CPU-only library.
+
 paddleocr
 ruff==0.6.7
 pre-commit==3.8.0
@@ -30,4 +44,6 @@ google-auth<3,>=2
 screeninfo
 uiautomation
 dashscope
+
 groq
+
