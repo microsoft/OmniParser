@@ -46,6 +46,13 @@ OmniParser prefers this local weight. After the PR is merged, it will download t
    mv weights/icon_caption weights/icon_caption_florence
 ```
 
+### Alternative Installation using setup.sh
+Alternatively, you can use the provided setup script:
+```bash
+./setup.sh
+```
+This script will automatically set up the environment and download the necessary weights for you.
+
 <!-- ## [deprecated]
 Then download the model ckpts files in: https://huggingface.co/microsoft/OmniParser, and put them under weights/, default folder structure is: weights/icon_detect, weights/icon_caption_florence, weights/icon_caption_blip2. 
 
@@ -83,4 +90,3 @@ If you find our work useful, please consider citing our work:
       primaryClass={cs.CV},
       url={https://arxiv.org/abs/2408.00203}, 
 }
-```
