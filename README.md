@@ -5,6 +5,13 @@
 </p>
 <!-- <a href="https://trendshift.io/repositories/12975" target="_blank"><img src="https://trendshift.io/api/badge/repositories/12975" alt="microsoft%2FOmniParser | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a> -->
 
+<p align="center">
+[ <b>En</b> |
+<a href="docs/README_CN.md">中</a> |
+<a href="docs/README_FR.md">Fr</a> |
+<a href="docs/README_JA.md">日</a> ] 
+</p>
+
 [![arXiv](https://img.shields.io/badge/Paper-green)](https://arxiv.org/abs/2408.00203)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
