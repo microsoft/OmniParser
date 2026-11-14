@@ -13,7 +13,7 @@
 **OmniParser** is a comprehensive method for parsing user interface screenshots into structured and easy-to-understand elements, which significantly enhances the ability of GPT-4V to generate actions that can be accurately grounded in the corresponding regions of the interface. 
 
 ## News
-- [2026/7] We add a YOLOv9-E interactive region detector. Its inference-only weight is available in [Hugging Face PR #37](https://huggingface.co/microsoft/OmniParser-v2.0/discussions/37).
+- [2026/7] We retrained the YOLOv9-E interactive region detector and released its MIT-licensed weights on [Hugging Face](https://huggingface.co/microsoft/OmniParser-v2.0), making OmniParser fully MIT-licensed.
 - [2025/3] We support local logging of trajecotry so that you can use OmniParser+OmniTool to build training data pipeline for your favorate agent in your domain. [Documentation WIP]
 - [2025/3] We are gradually adding multi agents orchstration and improving user interface in OmniTool for better experience.
 - [2025/2] We release OmniParser V2 [checkpoints](https://huggingface.co/microsoft/OmniParser-v2.0). [Watch Video](https://1drv.ms/v/c/650b027c18d5a573/EWXbVESKWo9Buu6OYCwg06wBeoM97C6EOTG6RjvWLEN1Qg?e=alnHGC)
