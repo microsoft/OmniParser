@@ -3,8 +3,8 @@ easyocr
 torchvision
 supervision==0.18.0
 openai==1.3.5
-transformers
-huggingface_hub
+transformers==4.49.0
+huggingface_hub==0.36.2
 ultralytics==8.3.70
 azure-identity
 numpy==1.26.4
